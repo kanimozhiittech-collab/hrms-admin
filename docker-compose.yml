@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test1234
+      POSTGRES_DB: hrms
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://hrms:hrms@db:5432/hrms
+      JWT_SECRET: change-me-in-prod
+      JWT_ALG: HS256
+      CORS_ORIGINS: http://localhost:3000
+      SEED_ON_BOOT: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["8000:8000"]
+    volumes: ["./backend:/app", "uploads:/app/uploads"]
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on: [backend]
+    ports: ["3000:3000"]
+    volumes: ["./frontend:/app", "/app/node_modules", "/app/.next"]
+
+volumes:
+  pgdata:
+  uploads:
