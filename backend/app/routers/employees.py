@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from pathlib import Path
-import shutil, uuid
+import shutil, tempfile, uuid
 from typing import Optional
 from ..database import get_db
 from ..models import (Employee, EmployeeAddress, EducationRecord, ExperienceRecord,
@@ -13,8 +13,9 @@ from ..core.security import hash_password
 from .deps import current_user
 
 router = APIRouter(prefix="/api/employees", tags=["employees"])
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Serverless filesystems (e.g. Vercel) are read-only outside the OS temp dir,
+# so store there instead of a project-relative "uploads" folder.
+UPLOAD_DIR = Path(tempfile.gettempdir()) / "hrms_uploads"
 
 # Default password every new employee uses for their first login.
 DEFAULT_EMPLOYEE_PASSWORD = "Welcome@123"
@@ -162,6 +163,7 @@ def upload_document(emp_id: str, doc_type: str = Form(...), file: UploadFile = F
     if not e: raise HTTPException(404, "Not found")
     ext = Path(file.filename or "").suffix
     fname = f"{uuid.uuid4().hex}{ext}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     fpath = UPLOAD_DIR / fname
     with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
     doc = EmployeeDocument(employee_id=e.id, doc_type=doc_type,
