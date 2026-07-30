@@ -1,7 +1,7 @@
 "use client";
 import { tokenStore } from "./auth";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
