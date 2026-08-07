@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 24
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     SEED_ON_BOOT: str = "1"
+    PROVISION_SECRET: str = "dev-provision-secret"
 
     class Config:
         env_file = ".env"

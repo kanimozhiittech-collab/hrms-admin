@@ -26,7 +26,7 @@ export default function RegisterPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   useEffect(() => {
     superadmin.listPlans()
@@ -39,14 +39,14 @@ export default function RegisterPage() {
     if (planId === null) { toast.error("Please select a plan"); return; }
     setLoading(true);
     try {
-      await superadmin.registerCompany({
+      const result = await superadmin.registerCompany({
         company_name: companyName,
         admin_name: adminName,
         admin_email: adminEmail,
         phone: phone || null,
         plan_id: planId,
       });
-      setDone(true);
+      setTempPassword(result.temp_password);
     } catch (err: any) {
       toast.error(err.message || "Registration failed");
     } finally {
@@ -54,19 +54,23 @@ export default function RegisterPage() {
     }
   }
 
-  if (done) {
+  if (tempPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center space-y-4">
           <CheckCircle2 className="h-12 w-12 text-brand-600 mx-auto" />
-          <h1 className="text-2xl font-semibold text-slate-900">Registration submitted!</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">You&apos;re all set!</h1>
           <p className="text-sm text-slate-500">
-            Thanks, <span className="font-medium">{companyName}</span>. Our team will review your
-            registration. Once approved, login details will be sent to{" "}
-            <span className="font-medium">{adminEmail}</span>.
+            <span className="font-medium">{companyName}</span> is ready to go. Log in with:
           </p>
-          <Link href="/login" className="inline-block text-sm font-medium text-brand-600 underline">
-            Back to login
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-left text-sm">
+            <p className="text-slate-500">Email</p>
+            <p className="font-medium text-slate-900">{adminEmail}</p>
+            <p className="mt-2 text-slate-500">Temporary password</p>
+            <p className="font-medium text-slate-900">{tempPassword}</p>
+          </div>
+          <Link href="/login">
+            <Button className="w-full">Sign in now</Button>
           </Link>
         </div>
       </div>
