@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { tokenStore } from "@/lib/auth";
 import {
   Briefcase,
   Cake,
@@ -17,6 +20,7 @@ import {
   HeartPulse,
   Link2,
   ListChecks,
+  LogOut,
   Mail,
   Megaphone,
   MoreHorizontal,
@@ -802,9 +806,69 @@ function ActivePanel({
   return <GenericPanel title={active} data={data} />;
 }
 
+function HeaderProfileMenu() {
+  const router = useRouter();
+  const [me, setMe] = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function logout() { tokenStore.clear(); router.replace("/login"); }
+
+  return (
+    <div ref={menuRef} className="relative ml-auto self-center">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-slate-700 hover:bg-slate-100"
+      >
+        <div className="h-5 w-5 rounded-full bg-brand-100 text-brand-700 grid place-items-center text-[10px] font-semibold">
+          {me?.email?.[0]?.toUpperCase() ?? "A"}
+        </div>
+        <span className="hidden sm:inline">{me?.email ?? "Account"}</span>
+        <ChevronDown className="h-3 w-3 text-slate-400"/>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg py-1 z-30">
+          <Link
+            href="/dashboard?tab=Profile"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <CircleUserRound className="h-4 w-4"/>Profile
+          </Link>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+          >
+            <LogOut className="h-4 w-4"/>Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
+  );
+}
+
+function DashboardPageInner() {
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
   const [mainTab, setMainTab] = useState("overview");
-  const [workTab, setWorkTab] = useState("Activities");
+  const [workTab, setWorkTab] = useState(requestedTab || "Activities");
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
@@ -813,10 +877,10 @@ export default function DashboardPage() {
     api.dashboardOverview()
       .then((data) => {
         setOverview(data);
-        setWorkTab(data.tabs?.[0] ?? "Activities");
+        setWorkTab(requestedTab || data.tabs?.[0] || "Activities");
       })
       .catch((error) => setOverviewError(error.message || "Unable to load overview"));
-  }, []);
+  }, [requestedTab]);
 
   async function handleCheckIn() {
     setCheckingIn(true);
@@ -847,6 +911,7 @@ export default function DashboardPage() {
             {tab}
           </button>
         ))}
+        <HeaderProfileMenu/>
       </div>
 
       <div className="relative">

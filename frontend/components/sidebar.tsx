@@ -67,11 +67,15 @@ export function Sidebar() {
           </div>
         </div>
       </nav>
-      <div className="p-3 border-t border-white/10">
-        <div className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-md cursor-pointer">
-          <Settings className="h-4 w-4"/>Settings
+      {isHR && (
+        <div className="p-3 border-t border-white/10">
+          <Link href="/settings"
+            className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm",
+              pathname.startsWith("/settings") ? "bg-brand-600 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white")}>
+            <Settings className="h-4 w-4"/>Settings
+          </Link>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

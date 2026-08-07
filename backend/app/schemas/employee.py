@@ -129,20 +129,34 @@ class EmployeeOut(EmployeeIn):
     documents: List[DocumentOut] = []
     class Config: from_attributes = True
 
+class DepartmentIn(BaseModel):
+    name: str
+
 class DepartmentOut(BaseModel):
     id: str
     name: str
     class Config: from_attributes = True
+
+class DesignationIn(BaseModel):
+    title: str
 
 class DesignationOut(BaseModel):
     id: str
     title: str
     class Config: from_attributes = True
 
+class LocationIn(BaseModel):
+    name: str
+
 class LocationOut(BaseModel):
     id: str
     name: str
     class Config: from_attributes = True
+
+class ShiftIn(BaseModel):
+    name: str
+    start_time: str
+    end_time: str
 
 class ShiftOut(BaseModel):
     id: str

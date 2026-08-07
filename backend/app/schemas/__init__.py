@@ -2,7 +2,8 @@ from .auth import LoginIn, TokenOut, Me
 from .employee import (
     EmployeeIn, EmployeeOut, EmployeeListItem, EmployeeListResponse,
     AddressIn, EducationIn, ExperienceIn, DependentIn, EmergencyIn, DocumentOut,
-    DepartmentOut, DesignationOut, LocationOut, ShiftOut
+    DepartmentIn, DepartmentOut, DesignationIn, DesignationOut,
+    LocationIn, LocationOut, ShiftIn, ShiftOut
 )
 from .dashboard import DashboardStats
 from .attendance import (
