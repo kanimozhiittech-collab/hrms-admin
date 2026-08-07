@@ -1,14 +1,27 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { tokenStore } from "@/lib/auth";
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Search, User } from "lucide-react";
 
 export function Topbar({ title }: { title: string }) {
   const router = useRouter();
   const [me, setMe] = useState<any>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => { api.me().then(setMe).catch(() => { tokenStore.clear(); router.replace("/login"); }); }, []);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
   function logout() { tokenStore.clear(); router.replace("/login"); }
 
   return (
@@ -21,17 +34,37 @@ export function Topbar({ title }: { title: string }) {
             <input placeholder="Search…" className="h-9 w-64 rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"/>
           </div>
           <button className="h-9 w-9 grid place-items-center rounded-md text-slate-600 hover:bg-slate-100"><Bell className="h-4 w-4"/></button>
-          <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
-            <div className="h-8 w-8 rounded-full bg-brand-100 text-brand-700 grid place-items-center text-sm font-semibold">
-              {me?.email?.[0]?.toUpperCase() ?? "A"}
-            </div>
-            <div className="hidden md:block text-xs">
-              <div className="font-medium text-slate-900">{me?.email ?? "—"}</div>
-              <div className="text-slate-500 capitalize">{me?.role?.replaceAll("_"," ") ?? ""}</div>
-            </div>
-            <button onClick={logout} title="Logout" className="ml-1 h-9 w-9 grid place-items-center rounded-md text-slate-500 hover:bg-slate-100">
-              <LogOut className="h-4 w-4"/>
+          <div ref={menuRef} className="relative pl-3 border-l border-slate-200">
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              className="flex items-center gap-2 py-1.5 pr-1 rounded-md hover:bg-slate-50"
+            >
+              <div className="h-8 w-8 rounded-full bg-brand-100 text-brand-700 grid place-items-center text-sm font-semibold">
+                {me?.email?.[0]?.toUpperCase() ?? "A"}
+              </div>
+              <div className="hidden md:block text-xs text-left">
+                <div className="font-medium text-slate-900">{me?.email ?? "—"}</div>
+                <div className="text-slate-500 capitalize">{me?.role?.replaceAll("_"," ") ?? ""}</div>
+              </div>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400"/>
             </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg py-1 z-20">
+                <Link
+                  href="/dashboard?tab=Profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <User className="h-4 w-4"/>Profile
+                </Link>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4"/>Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

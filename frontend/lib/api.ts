@@ -47,9 +47,24 @@ export const api = {
   },
 
   departments: () => request<any[]>("/api/meta/departments"),
+  createDepartment: (data: any) => request<any>("/api/meta/departments", { method: "POST", body: JSON.stringify(data) }),
+  updateDepartment: (id: string, data: any) => request<any>(`/api/meta/departments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteDepartment: (id: string) => request<void>(`/api/meta/departments/${id}`, { method: "DELETE" }),
+
   designations: () => request<any[]>("/api/meta/designations"),
+  createDesignation: (data: any) => request<any>("/api/meta/designations", { method: "POST", body: JSON.stringify(data) }),
+  updateDesignation: (id: string, data: any) => request<any>(`/api/meta/designations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteDesignation: (id: string) => request<void>(`/api/meta/designations/${id}`, { method: "DELETE" }),
+
   locations: () => request<any[]>("/api/meta/locations"),
+  createLocation: (data: any) => request<any>("/api/meta/locations", { method: "POST", body: JSON.stringify(data) }),
+  updateLocation: (id: string, data: any) => request<any>(`/api/meta/locations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteLocation: (id: string) => request<void>(`/api/meta/locations/${id}`, { method: "DELETE" }),
+
   shifts: () => request<any[]>("/api/meta/shifts"),
+  createShift: (data: any) => request<any>("/api/meta/shifts", { method: "POST", body: JSON.stringify(data) }),
+  updateShift: (id: string, data: any) => request<any>(`/api/meta/shifts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteShift: (id: string) => request<void>(`/api/meta/shifts/${id}`, { method: "DELETE" }),
 
   // ── Attendance ──
   myAttendance: (month?: number, year?: number) => {
