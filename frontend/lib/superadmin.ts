@@ -31,8 +31,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+export interface CompanyRegisterResult {
+  id: number;
+  admin_email: string;
+  temp_password: string;
+}
+
 export const superadmin = {
   listPlans: () => request<Plan[]>("/plans"),
   registerCompany: (data: CompanyRegisterInput) =>
-    request<{ id: number }>("/companies/register", { method: "POST", body: JSON.stringify(data) }),
+    request<CompanyRegisterResult>("/companies/register", { method: "POST", body: JSON.stringify(data) }),
 };

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import Base, engine
 from .core.config import settings
 from . import models  # noqa
-from .routers import auth, employees, dashboard, meta, attendance, leave
+from .routers import auth, employees, dashboard, meta, attendance, leave, provisioning
 from .seed import seed_if_empty, ensure_defaults
 
 app = FastAPI(title="HRMS API", version="0.1.0")
@@ -30,6 +30,7 @@ app.include_router(employees.router)
 app.include_router(dashboard.router)
 app.include_router(attendance.router)
 app.include_router(leave.router)
+app.include_router(provisioning.router)
 
 @app.get("/")
 def root():
