@@ -6,121 +6,46 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
-import { Plus, Trash2, Check, X, Pencil } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Plus, Trash2, X, Pencil, ArrowLeft, Download,
+  Users, CalendarDays, Clock, FileText, Building2,
+  Mail, ListChecks, Settings2,
+} from "lucide-react";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
+const ADMIN_ROLES = ["super_admin", "company_admin"];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-function MasterTab({
-  fetchAll, onCreate, onUpdate, onDelete, field, label, placeholder,
-}: {
-  fetchAll: () => Promise<any[]>;
-  onCreate: (value: string) => Promise<any>;
-  onUpdate: (id: string, value: string) => Promise<any>;
-  onDelete: (id: string) => Promise<void>;
-  field: string;
-  label: string;
-  placeholder: string;
-}) {
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newValue, setNewValue] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [error, setError] = useState("");
+const SERVICES = [
+  { key: "manage-accounts", label: "Manage Accounts", icon: Users, status: "ready" as const },
+  { key: "leave-tracker", label: "Leave Tracker", icon: CalendarDays, status: "link" as const, href: "/leaves" },
+  { key: "shifts", label: "Shifts", icon: Clock, status: "ready" as const },
+  { key: "files", label: "Files", icon: FileText, status: "ready" as const },
+  { key: "employee-info", label: "Employee Information", icon: Building2, status: "ready" as const },
+  { key: "hr-letters", label: "HR Letters", icon: Mail, status: "ready" as const },
+  { key: "tasks", label: "Tasks", icon: ListChecks, status: "ready" as const },
+  { key: "general", label: "General", icon: Settings2, status: "ready" as const },
+];
 
-  async function load() {
-    setLoading(true);
-    try { setItems(await fetchAll()); } finally { setLoading(false); }
-  }
-  useEffect(() => { load(); }, []);
-
-  async function add() {
-    if (!newValue.trim()) return;
-    setSaving(true); setError("");
-    try { await onCreate(newValue.trim()); setNewValue(""); await load(); }
-    catch (e: any) { setError(e.message); }
-    finally { setSaving(false); }
-  }
-
-  async function saveEdit(id: string) {
-    if (!editValue.trim()) return;
-    setError("");
-    try { await onUpdate(id, editValue.trim()); setEditingId(null); await load(); }
-    catch (e: any) { setError(e.message); }
-  }
-
-  async function remove(id: string) {
-    if (!confirm(`Delete this ${label.toLowerCase()}?`)) return;
-    setError("");
-    try { await onDelete(id); await load(); }
-    catch (e: any) { setError(e.message); }
-  }
-
-  return (
-    <Card>
-      <div className="p-4 flex gap-2 border-b border-slate-100">
-        <Input
-          placeholder={placeholder}
-          value={newValue}
-          onChange={e => setNewValue(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && add()}
-          className="max-w-xs"
-        />
-        <Button size="sm" onClick={add} disabled={saving || !newValue.trim()}>
-          <Plus className="h-4 w-4" />Add {label}
-        </Button>
-      </div>
-      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
-      <div className="divide-y divide-slate-100">
-        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No {label.toLowerCase()}s yet.</div>
-        )}
-        {items.map(item => (
-          <div key={item.id} className="px-4 py-3 flex items-center gap-3">
-            {editingId === item.id ? (
-              <>
-                <Input
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && saveEdit(item.id)}
-                  className="max-w-xs"
-                  autoFocus
-                />
-                <button onClick={() => saveEdit(item.id)} className="text-green-600 hover:text-green-700">
-                  <Check className="h-4 w-4" />
-                </button>
-                <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600">
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 text-sm text-slate-900">{item[field]}</span>
-                <button
-                  onClick={() => { setEditingId(item.id); setEditValue(item[field]); }}
-                  className="text-slate-400 hover:text-slate-700"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button onClick={() => remove(item.id)} className="text-slate-400 hover:text-red-600">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
+function useEmployeeOptions() {
+  const [employees, setEmployees] = useState<any[]>([]);
+  useEffect(() => {
+    api.listEmployees({ page_size: 100 }).then(res => setEmployees(res.items || [])).catch(() => {});
+  }, []);
+  return employees;
 }
 
 function ShiftsTab() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", start_time: "09:00", end_time: "18:00" });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", start_time: "09:00", end_time: "18:00", color: "#2563eb" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -130,10 +55,14 @@ function ShiftsTab() {
   }
   useEffect(() => { load(); }, []);
 
+  function resetForm() {
+    setForm({ name: "", start_time: "09:00", end_time: "18:00", color: "#2563eb" });
+  }
+
   async function add() {
     if (!form.name.trim()) return;
     setSaving(true); setError("");
-    try { await api.createShift(form); setForm({ name: "", start_time: "09:00", end_time: "18:00" }); await load(); }
+    try { await api.createShift(form); resetForm(); setShowForm(false); await load(); }
     catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }
@@ -147,35 +76,9 @@ function ShiftsTab() {
 
   return (
     <Card>
-      <div className="p-4 flex flex-wrap items-end gap-2 border-b border-slate-100">
-        <div>
-          <label className="text-xs text-slate-500 block mb-1">Shift name</label>
-          <Input
-            placeholder="e.g. General Shift"
-            value={form.name}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            className="w-48"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-slate-500 block mb-1">Start time</label>
-          <Input
-            type="time"
-            value={form.start_time}
-            onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))}
-            className="w-32"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-slate-500 block mb-1">End time</label>
-          <Input
-            type="time"
-            value={form.end_time}
-            onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))}
-            className="w-32"
-          />
-        </div>
-        <Button size="sm" onClick={add} disabled={saving || !form.name.trim()}>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} shift{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4" />Add Shift
         </Button>
       </div>
@@ -187,6 +90,7 @@ function ShiftsTab() {
         )}
         {items.map(s => (
           <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+            <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color || "#94a3b8" }} />
             <span className="flex-1 text-sm text-slate-900">{s.name}</span>
             <span className="text-xs text-slate-500 font-mono">{s.start_time} – {s.end_time}</span>
             <button onClick={() => remove(s.id)} className="text-slate-400 hover:text-red-600">
@@ -195,6 +99,1174 @@ function ShiftsTab() {
           </div>
         ))}
       </div>
+
+      {showForm && (
+        <Modal
+          title="Add Shift"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={add} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Shift Name *">
+            <Input placeholder="e.g. General Shift" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus/>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Start Time">
+              <Input type="time" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="End Time">
+              <Input type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))}/>
+            </ModalField>
+          </div>
+          <ModalField label="Color">
+            <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+              className="h-9 w-16 rounded-md border border-slate-200 p-1"/>
+          </ModalField>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function DepartmentsService() {
+  const employees = useEmployeeOptions();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.departments()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function resetForm() {
+    setForm({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
+    setEditingId(null);
+  }
+
+  function startEdit(d: any) {
+    setForm({
+      name: d.name, code: d.code || "", mail_alias: d.mail_alias || "",
+      lead_id: d.lead_id || "", parent_id: d.parent_id || "",
+    });
+    setEditingId(d.id);
+    setShowForm(true);
+  }
+
+  async function save() {
+    if (!form.name.trim()) return;
+    setSaving(true); setError("");
+    const payload = {
+      name: form.name.trim(),
+      code: form.code.trim() || null,
+      mail_alias: form.mail_alias.trim() || null,
+      lead_id: form.lead_id || null,
+      parent_id: form.parent_id || null,
+    };
+    try {
+      if (editingId) await api.updateDepartment(editingId, payload);
+      else await api.createDepartment(payload);
+      resetForm(); setShowForm(false); await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this department?")) return;
+    setError("");
+    try { await api.deleteDepartment(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} department{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="h-4 w-4" />Add Department
+        </Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No departments yet.</div>
+        )}
+        {items.map(d => (
+          <div key={d.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900">{d.name}{d.code ? ` (${d.code})` : ""}</div>
+              <div className="text-xs text-slate-500">
+                {d.mail_alias ? `${d.mail_alias} · ` : ""}
+                {d.lead_name ? `Head: ${d.lead_name}` : "No head"}
+                {d.parent_name ? ` · Under ${d.parent_name}` : ""}
+              </div>
+            </div>
+            <button onClick={() => startEdit(d)} className="text-slate-400 hover:text-slate-700">
+              <Pencil className="h-3.5 w-3.5"/>
+            </button>
+            <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title={editingId ? "Edit Department" : "Add Department"}
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={save} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Department Name *">
+            <Input placeholder="e.g. Engineering" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus/>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Department Code">
+              <Input placeholder="Optional" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Mail Alias">
+              <Input placeholder="Optional" value={form.mail_alias} onChange={e => setForm(f => ({ ...f, mail_alias: e.target.value }))}/>
+            </ModalField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Department Head">
+              <Select value={form.lead_id} onChange={e => setForm(f => ({ ...f, lead_id: e.target.value }))}>
+                <option value="">Select</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+              </Select>
+            </ModalField>
+            <ModalField label="Parent Department">
+              <Select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}>
+                <option value="">Select</option>
+                {items.filter(d => d.id !== editingId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </Select>
+            </ModalField>
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function DesignationsService() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", code: "", mail_alias: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.designations()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function resetForm() {
+    setForm({ title: "", code: "", mail_alias: "" });
+    setEditingId(null);
+  }
+
+  function startEdit(d: any) {
+    setForm({ title: d.title, code: d.code || "", mail_alias: d.mail_alias || "" });
+    setEditingId(d.id);
+    setShowForm(true);
+  }
+
+  async function save() {
+    if (!form.title.trim()) return;
+    setSaving(true); setError("");
+    const payload = {
+      title: form.title.trim(),
+      code: form.code.trim() || null,
+      mail_alias: form.mail_alias.trim() || null,
+    };
+    try {
+      if (editingId) await api.updateDesignation(editingId, payload);
+      else await api.createDesignation(payload);
+      resetForm(); setShowForm(false); await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this designation?")) return;
+    setError("");
+    try { await api.deleteDesignation(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} designation{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="h-4 w-4" />Add Designation
+        </Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No designations yet.</div>
+        )}
+        {items.map(d => (
+          <div key={d.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900">{d.title}{d.code ? ` (${d.code})` : ""}</div>
+              {d.mail_alias && <div className="text-xs text-slate-500">{d.mail_alias}</div>}
+            </div>
+            <button onClick={() => startEdit(d)} className="text-slate-400 hover:text-slate-700">
+              <Pencil className="h-3.5 w-3.5"/>
+            </button>
+            <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title={editingId ? "Edit Designation" : "Add Designation"}
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={save} disabled={saving || !form.title.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Designation Name *">
+            <Input placeholder="e.g. Software Engineer" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus/>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Designation Code">
+              <Input placeholder="Optional" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Mail Alias">
+              <Input placeholder="Optional" value={form.mail_alias} onChange={e => setForm(f => ({ ...f, mail_alias: e.target.value }))}/>
+            </ModalField>
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+const BLANK_LOCATION = {
+  name: "", code: "", mail_alias: "",
+  address_line1: "", address_line2: "", city: "", state: "", country: "", postal_code: "",
+  description: "",
+};
+
+function LocationsService() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(BLANK_LOCATION);
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.locations()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function resetForm() {
+    setForm(BLANK_LOCATION);
+    setEditingId(null);
+  }
+
+  function startEdit(l: any) {
+    setForm({
+      name: l.name, code: l.code || "", mail_alias: l.mail_alias || "",
+      address_line1: l.address_line1 || "", address_line2: l.address_line2 || "",
+      city: l.city || "", state: l.state || "", country: l.country || "", postal_code: l.postal_code || "",
+      description: l.description || "",
+    });
+    setEditingId(l.id);
+    setShowForm(true);
+  }
+
+  async function save() {
+    if (!form.name.trim()) return;
+    setSaving(true); setError("");
+    const payload = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, v.trim() || null])
+    );
+    try {
+      if (editingId) await api.updateLocation(editingId, payload);
+      else await api.createLocation(payload);
+      resetForm(); setShowForm(false); await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this location?")) return;
+    setError("");
+    try { await api.deleteLocation(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} location{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="h-4 w-4" />Add Location
+        </Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No locations yet.</div>
+        )}
+        {items.map(l => (
+          <div key={l.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900">{l.name}{l.code ? ` (${l.code})` : ""}</div>
+              <div className="text-xs text-slate-500">
+                {[l.address_line1, l.city, l.state, l.country, l.postal_code, l.mail_alias].filter(Boolean).join(", ") || "—"}
+              </div>
+            </div>
+            <button onClick={() => startEdit(l)} className="text-slate-400 hover:text-slate-700">
+              <Pencil className="h-3.5 w-3.5"/>
+            </button>
+            <button onClick={() => remove(l.id)} className="text-slate-400 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title={editingId ? "Edit Location" : "Add Location"}
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={save} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <div className="grid sm:grid-cols-2 gap-x-4">
+            <div>
+              <ModalField label="Location Name *">
+                <Input placeholder="e.g. Chennai Office" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus/>
+              </ModalField>
+              <ModalField label="Location Code">
+                <Input placeholder="Optional" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="Mail Alias">
+                <Input placeholder="Optional" value={form.mail_alias} onChange={e => setForm(f => ({ ...f, mail_alias: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="Description">
+                <Textarea placeholder="Optional" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="min-h-[86px]"/>
+              </ModalField>
+            </div>
+            <div>
+              <ModalField label="Address Line 1">
+                <Input placeholder="Optional" value={form.address_line1} onChange={e => setForm(f => ({ ...f, address_line1: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="Address Line 2">
+                <Input placeholder="Optional" value={form.address_line2} onChange={e => setForm(f => ({ ...f, address_line2: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="City">
+                <Input placeholder="Optional" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}/>
+              </ModalField>
+              <div className="grid grid-cols-2 gap-4">
+                <ModalField label="Country">
+                  <Input placeholder="Optional" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}/>
+                </ModalField>
+                <ModalField label="State">
+                  <Input placeholder="Optional" value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))}/>
+                </ModalField>
+              </div>
+              <ModalField label="Postal Code">
+                <Input placeholder="Optional" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))}/>
+              </ModalField>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function OrganizationDetailsService() {
+  const [company, setCompany] = useState<any>(null);
+  const [form, setForm] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const c = await api.getCompany();
+      setCompany(c);
+      setForm({
+        name: c.name || "", website: c.website || "", org_type: c.org_type || "",
+        contact_person: c.contact_person || "", contact_number: c.contact_number || "", contact_email: c.contact_email || "",
+        address_line1: c.address_line1 || "", address_line2: c.address_line2 || "",
+        city: c.city || "", state: c.state || "", country: c.country || "", postal_code: c.postal_code || "",
+      });
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    if (!form.name.trim()) return;
+    setSaving(true); setError(""); setSaved(false);
+    const payload = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, (v as string).trim() || null])
+    );
+    try {
+      const c = await api.updateCompany(payload);
+      setCompany(c);
+      setSaved(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function uploadLogo(file: File) {
+    setUploadingLogo(true); setError("");
+    try { setCompany(await api.uploadCompanyLogo(file)); }
+    catch (e: any) { setError(e.message); }
+    finally { setUploadingLogo(false); }
+  }
+
+  if (loading || !form) {
+    return <Card><div className="p-10 text-center text-sm text-slate-400">Loading…</div></Card>;
+  }
+
+  return (
+    <Card>
+      <div className="p-5 border-b border-slate-100">
+        <h3 className="text-sm font-semibold text-slate-900">Basic Details</h3>
+      </div>
+      <div className="p-5">
+        {error && <div className="mb-4 text-xs text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{error}</div>}
+        {saved && <div className="mb-4 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-3 py-2">Saved.</div>}
+        <div className="grid sm:grid-cols-2 gap-x-8">
+          <div>
+            <ModalField label="Logo">
+              <div className="flex items-center gap-3">
+                {company?.logo_url
+                  ? <img src={`${API_BASE}${company.logo_url}`} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200"/>
+                  : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
+                <label className="text-sm text-brand-600 hover:underline cursor-pointer">
+                  {uploadingLogo ? "Uploading…" : "Change"}
+                  <input
+                    type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
+                  />
+                </label>
+              </div>
+            </ModalField>
+            <ModalField label="Name *">
+              <Input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Website">
+              <Input placeholder="Company Website" value={form.website} onChange={e => setForm((f: any) => ({ ...f, website: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Type of Organization">
+              <Input placeholder="e.g. IT Services" value={form.org_type} onChange={e => setForm((f: any) => ({ ...f, org_type: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Contact Person">
+              <Input placeholder="Contact person" value={form.contact_person} onChange={e => setForm((f: any) => ({ ...f, contact_person: e.target.value }))}/>
+            </ModalField>
+            <div className="grid grid-cols-2 gap-4">
+              <ModalField label="Contact Number">
+                <Input value={form.contact_number} onChange={e => setForm((f: any) => ({ ...f, contact_number: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="Contact Email *">
+                <Input type="email" value={form.contact_email} onChange={e => setForm((f: any) => ({ ...f, contact_email: e.target.value }))}/>
+              </ModalField>
+            </div>
+          </div>
+          <div>
+            <ModalField label="Primary Address — Line 1">
+              <Input placeholder="Address Line 1" value={form.address_line1} onChange={e => setForm((f: any) => ({ ...f, address_line1: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Address Line 2">
+              <Input placeholder="Address Line 2" value={form.address_line2} onChange={e => setForm((f: any) => ({ ...f, address_line2: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="City">
+              <Input value={form.city} onChange={e => setForm((f: any) => ({ ...f, city: e.target.value }))}/>
+            </ModalField>
+            <div className="grid grid-cols-2 gap-4">
+              <ModalField label="Country">
+                <Input value={form.country} onChange={e => setForm((f: any) => ({ ...f, country: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="State">
+                <Input value={form.state} onChange={e => setForm((f: any) => ({ ...f, state: e.target.value }))}/>
+              </ModalField>
+            </div>
+            <ModalField label="ZIP/PIN Code">
+              <Input value={form.postal_code} onChange={e => setForm((f: any) => ({ ...f, postal_code: e.target.value }))}/>
+            </ModalField>
+          </div>
+        </div>
+        <div className="mt-2">
+          <Button onClick={save} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Save"}</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function EmployeeInformationService() {
+  return (
+    <Tabs defaultValue="organization">
+      <TabsList>
+        <TabsTrigger value="organization">Organization Details</TabsTrigger>
+        <TabsTrigger value="departments">Departments</TabsTrigger>
+        <TabsTrigger value="designations">Designations</TabsTrigger>
+        <TabsTrigger value="locations">Work Locations</TabsTrigger>
+      </TabsList>
+      <TabsContent value="organization">
+        <OrganizationDetailsService />
+      </TabsContent>
+      <TabsContent value="departments">
+        <DepartmentsService />
+      </TabsContent>
+      <TabsContent value="designations">
+        <DesignationsService />
+      </TabsContent>
+      <TabsContent value="locations">
+        <LocationsService />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function UsersService() {
+  const [me, setMe] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ email: "", role: "employee" });
+  const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+
+  useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.listUsers()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    if (!form.email.trim()) return;
+    setSaving(true); setError("");
+    try {
+      const res = await api.createUser(form);
+      setCreated({ email: res.email, password: res.temp_password });
+      setForm({ email: "", role: "employee" });
+      setShowForm(false);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function changeRole(id: string, role: string) {
+    setError("");
+    try { await api.updateUserRole(id, role); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  async function toggleActive(id: string) {
+    setError("");
+    try { await api.toggleUserActive(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  if (me && !ADMIN_ROLES.includes(me.role)) {
+    return <div className="py-16 text-center text-sm text-slate-400">Only company admins can manage user accounts.</div>;
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} user account{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => setShowForm(true)}>
+          <Plus className="h-4 w-4" />Add User
+        </Button>
+      </div>
+
+      {created && (
+        <div className="px-4 py-3 border-b border-emerald-100 bg-emerald-50 text-sm text-emerald-800 flex items-center justify-between gap-3">
+          <span>
+            Account created for <strong>{created.email}</strong> — temp password:{" "}
+            <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{created.password}</code>
+          </span>
+          <button onClick={() => setCreated(null)} className="text-emerald-600 hover:text-emerald-800 shrink-0">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left">
+              <th className="px-4 py-3 font-medium">Email</th>
+              <th className="px-4 py-3 font-medium">Employee</th>
+              <th className="px-4 py-3 font-medium">Role</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Login</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No user accounts yet.</td></tr>
+            )}
+            {items.map(u => (
+              <tr key={u.id} className="border-t border-slate-100">
+                <td className="px-4 py-3 text-slate-900">{u.email}</td>
+                <td className="px-4 py-3 text-slate-600">{u.employee_name || "—"}</td>
+                <td className="px-4 py-3">
+                  <Select
+                    value={u.role} onChange={e => changeRole(u.id, e.target.value)}
+                    disabled={me && u.id === me.id}
+                    className="w-36 h-8 text-xs"
+                  >
+                    <option value="company_admin">Company Admin</option>
+                    <option value="hr_manager">HR Manager</option>
+                    <option value="employee">Employee</option>
+                  </Select>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge tone={u.is_active ? "green" : "slate"}>{u.is_active ? "Active" : "Inactive"}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => toggleActive(u.id)}
+                    disabled={me && u.id === me.id}
+                    className={cn(
+                      "relative h-5 w-9 rounded-full transition disabled:opacity-40 disabled:cursor-not-allowed",
+                      u.is_active ? "bg-brand-600" : "bg-slate-200"
+                    )}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 h-4 w-4 rounded-full bg-white transition",
+                      u.is_active ? "left-4" : "left-0.5"
+                    )} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <Modal
+          title="Add User"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={add} disabled={saving || !form.email.trim()}>{saving ? "Creating…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Email *">
+            <Input type="email" placeholder="name@company.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} autoFocus/>
+          </ModalField>
+          <ModalField label="Role">
+            <Select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+              <option value="company_admin">Company Admin</option>
+              <option value="hr_manager">HR Manager</option>
+              <option value="employee">Employee</option>
+            </Select>
+          </ModalField>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function FilesService() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [folder, setFolder] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.listFiles()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function upload() {
+    if (!name.trim() || !file) return;
+    setSaving(true); setError("");
+    try {
+      await api.uploadFile(name.trim(), description.trim(), folder.trim(), file);
+      setName(""); setDescription(""); setFolder(""); setFile(null); setShowForm(false);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this file?")) return;
+    setError("");
+    try { await api.deleteFile(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} file{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add File</Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No organization files added.</div>
+        )}
+        {items.map(f => (
+          <div key={f.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900 truncate">
+                {f.name}{f.folder ? <span className="ml-2 text-xs text-slate-400 font-normal">{f.folder}</span> : null}
+              </div>
+              {f.description && <div className="text-xs text-slate-500 truncate">{f.description}</div>}
+            </div>
+            <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-600">
+              <Download className="h-4 w-4"/>
+            </a>
+            <button onClick={() => remove(f.id)} className="text-slate-400 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title="Add File"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={upload} disabled={saving || !name.trim() || !file}>{saving ? "Uploading…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="File Name *">
+            <Input placeholder="e.g. Company Handbook" value={name} onChange={e => setName(e.target.value)} autoFocus/>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Description">
+              <Input placeholder="Optional" value={description} onChange={e => setDescription(e.target.value)}/>
+            </ModalField>
+            <ModalField label="Folder">
+              <Input placeholder="Optional" value={folder} onChange={e => setFolder(e.target.value)}/>
+            </ModalField>
+          </div>
+          <ModalField label="File *">
+            <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)}
+              className="text-sm file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs"/>
+          </ModalField>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function HrLettersService() {
+  const employees = useEmployeeOptions();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ employee_id: "", letter_type: "Bonafide Letter", date_of_request: new Date().toISOString().slice(0, 10), reason: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.listLetters()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    if (!form.employee_id) return;
+    setSaving(true); setError("");
+    try { await api.createLetter(form); setForm(f => ({ ...f, employee_id: "", reason: "" })); setShowForm(false); await load(); }
+    catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function setStatus(id: string, status: string) {
+    setError("");
+    try { await api.updateLetterStatus(id, status); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} request{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Request</Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left">
+              <th className="px-4 py-3 font-medium">Employee</th>
+              <th className="px-4 py-3 font-medium">Letter Type</th>
+              <th className="px-4 py-3 font-medium">Date of Request</th>
+              <th className="px-4 py-3 font-medium">Reason</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No records found.</td></tr>
+            )}
+            {items.map(r => (
+              <tr key={r.id} className="border-t border-slate-100">
+                <td className="px-4 py-3 text-slate-900">{r.employee_name || "—"}</td>
+                <td className="px-4 py-3 text-slate-600">{r.letter_type}</td>
+                <td className="px-4 py-3 text-slate-600">{r.date_of_request}</td>
+                <td className="px-4 py-3 text-slate-600">{r.reason || "—"}</td>
+                <td className="px-4 py-3">
+                  <Select value={r.status} onChange={e => setStatus(r.id, e.target.value)} className="w-32 h-8 text-xs">
+                    <option>Pending</option>
+                    <option>Issued</option>
+                    <option>Rejected</option>
+                  </Select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <Modal
+          title="Add Request"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={add} disabled={saving || !form.employee_id}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Employee *">
+            <Select value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}>
+              <option value="">Select</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+            </Select>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Letter Type">
+              <Select value={form.letter_type} onChange={e => setForm(f => ({ ...f, letter_type: e.target.value }))}>
+                <option>Address Proof</option>
+                <option>Bonafide Letter</option>
+                <option>Experience Letter</option>
+              </Select>
+            </ModalField>
+            <ModalField label="Date of Request">
+              <Input type="date" value={form.date_of_request} onChange={e => setForm(f => ({ ...f, date_of_request: e.target.value }))}/>
+            </ModalField>
+          </div>
+          <ModalField label="Reason for Request">
+            <Select value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}>
+              <option value="">Select</option>
+              <option>Visa application</option>
+              <option>Bank loan</option>
+              <option>Address proof</option>
+              <option>Higher education</option>
+              <option>Other</option>
+            </Select>
+          </ModalField>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function TasksService() {
+  const employees = useEmployeeOptions();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", description: "", owner_id: "", start_date: "", due_date: "", priority: "Moderate" });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.listHrTasks()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    if (!form.name.trim()) return;
+    setSaving(true); setError("");
+    try {
+      await api.createHrTask({
+        ...form, owner_id: form.owner_id || null,
+        start_date: form.start_date || null, due_date: form.due_date || null,
+      });
+      setForm({ name: "", description: "", owner_id: "", start_date: "", due_date: "", priority: "Moderate" });
+      setShowForm(false);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function setStatus(id: string, status: string) {
+    setError("");
+    try { await api.updateHrTaskStatus(id, status); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this task?")) return;
+    setError("");
+    try { await api.deleteHrTask(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} task{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Task</Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No tasks to list here.</div>
+        )}
+        {items.map(t => (
+          <div key={t.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900 truncate">{t.name}</div>
+              {t.description && <div className="text-xs text-slate-500 truncate">{t.description}</div>}
+              <div className="text-xs text-slate-500">
+                {t.owner_name || "Unassigned"}
+                {t.start_date ? ` · Starts ${t.start_date}` : ""}
+                {t.due_date ? ` · Due ${t.due_date}` : ""} · {t.priority}
+              </div>
+            </div>
+            <Select value={t.status} onChange={e => setStatus(t.id, e.target.value)} className="w-36 h-8 text-xs">
+              <option>Open</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+            </Select>
+            <button onClick={() => remove(t.id)} className="text-slate-400 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title="Add Task"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={add} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Task Name *">
+            <Input placeholder="e.g. Prepare offer letter" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus/>
+          </ModalField>
+          <ModalField label="Description">
+            <Textarea placeholder="Optional" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="min-h-[70px]"/>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Owner">
+              <Select value={form.owner_id} onChange={e => setForm(f => ({ ...f, owner_id: e.target.value }))}>
+                <option value="">Unassigned</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+              </Select>
+            </ModalField>
+            <ModalField label="Priority">
+              <Select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                <option>Low</option>
+                <option>Moderate</option>
+                <option>High</option>
+              </Select>
+            </ModalField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Start Date">
+              <Input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}/>
+            </ModalField>
+            <ModalField label="Due Date">
+              <Input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))}/>
+            </ModalField>
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function GeneralService() {
+  const employees = useEmployeeOptions();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ employee_id: "", separation_date: new Date().toISOString().slice(0, 10), interviewer_id: "", reason: "", feedback: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.listExitDetails()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    if (!form.employee_id) return;
+    setSaving(true); setError("");
+    try {
+      await api.createExitDetail({ ...form, interviewer_id: form.interviewer_id || null });
+      setForm(f => ({ ...f, employee_id: "", interviewer_id: "", reason: "", feedback: "" }));
+      setShowForm(false);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function setStatus(id: string, status: string) {
+    setError("");
+    try { await api.updateExitStatus(id, status); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex items-center justify-between border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} exit record{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Exit Details</Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left">
+              <th className="px-4 py-3 font-medium">Employee</th>
+              <th className="px-4 py-3 font-medium">Separation Date</th>
+              <th className="px-4 py-3 font-medium">Interviewer</th>
+              <th className="px-4 py-3 font-medium">Reason</th>
+              <th className="px-4 py-3 font-medium">Feedback</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No records found.</td></tr>
+            )}
+            {items.map(r => (
+              <tr key={r.id} className="border-t border-slate-100">
+                <td className="px-4 py-3 text-slate-900">{r.employee_name || "—"}</td>
+                <td className="px-4 py-3 text-slate-600">{r.separation_date}</td>
+                <td className="px-4 py-3 text-slate-600">{r.interviewer_name || "—"}</td>
+                <td className="px-4 py-3 text-slate-600">{r.reason || "—"}</td>
+                <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{r.feedback || "—"}</td>
+                <td className="px-4 py-3">
+                  <Select value={r.status} onChange={e => setStatus(r.id, e.target.value)} className="w-32 h-8 text-xs">
+                    <option>Pending</option>
+                    <option>Completed</option>
+                  </Select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <Modal
+          title="Add Exit Details"
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={add} disabled={saving || !form.employee_id}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Employee *">
+              <Select value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}>
+                <option value="">Select</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+              </Select>
+            </ModalField>
+            <ModalField label="Separation Date">
+              <Input type="date" value={form.separation_date} onChange={e => setForm(f => ({ ...f, separation_date: e.target.value }))}/>
+            </ModalField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Interviewer">
+              <Select value={form.interviewer_id} onChange={e => setForm(f => ({ ...f, interviewer_id: e.target.value }))}>
+                <option value="">None</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+              </Select>
+            </ModalField>
+            <ModalField label="Reason for Leaving">
+              <Input placeholder="Optional" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}/>
+            </ModalField>
+          </div>
+          <ModalField label="Exit Feedback">
+            <Textarea placeholder="Optional" value={form.feedback} onChange={e => setForm(f => ({ ...f, feedback: e.target.value }))} className="min-h-[80px]"/>
+          </ModalField>
+        </Modal>
+      )}
     </Card>
   );
 }
@@ -202,6 +1274,7 @@ function ShiftsTab() {
 export default function SettingsPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
     api.me().then(m => {
@@ -221,52 +1294,54 @@ export default function SettingsPage() {
     );
   }
 
+  const service = SERVICES.find(s => s.key === active);
+
+  if (service) {
+    return (
+      <>
+        <Topbar title="Settings" />
+        <div className="p-4 lg:p-6 space-y-4">
+          <button
+            onClick={() => setActive(null)}
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900"
+          >
+            <ArrowLeft className="h-4 w-4" />Settings
+          </button>
+          <h2 className="text-xl font-semibold text-slate-900">{service.label}</h2>
+          {service.key === "manage-accounts" && <UsersService />}
+          {service.key === "employee-info" && <EmployeeInformationService />}
+          {service.key === "shifts" && <ShiftsTab />}
+          {service.key === "files" && <FilesService />}
+          {service.key === "hr-letters" && <HrLettersService />}
+          {service.key === "tasks" && <TasksService />}
+          {service.key === "general" && <GeneralService />}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Topbar title="Settings" />
       <div className="p-4 lg:p-6 space-y-4">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Organization Setup</h2>
-          <p className="text-sm text-slate-500">Manage departments, designations, work locations and shifts</p>
+          <h2 className="text-xl font-semibold text-slate-900">Services</h2>
+          <p className="text-sm text-slate-500">Organization-wide setup and configuration</p>
         </div>
-        <Tabs defaultValue="departments">
-          <TabsList>
-            <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="designations">Designations</TabsTrigger>
-            <TabsTrigger value="locations">Work Locations</TabsTrigger>
-            <TabsTrigger value="shifts">Shifts</TabsTrigger>
-          </TabsList>
-          <TabsContent value="departments">
-            <MasterTab
-              fetchAll={api.departments}
-              onCreate={name => api.createDepartment({ name })}
-              onUpdate={(id, name) => api.updateDepartment(id, { name })}
-              onDelete={api.deleteDepartment}
-              field="name" label="Department" placeholder="e.g. Engineering"
-            />
-          </TabsContent>
-          <TabsContent value="designations">
-            <MasterTab
-              fetchAll={api.designations}
-              onCreate={title => api.createDesignation({ title })}
-              onUpdate={(id, title) => api.updateDesignation(id, { title })}
-              onDelete={api.deleteDesignation}
-              field="title" label="Designation" placeholder="e.g. Software Engineer"
-            />
-          </TabsContent>
-          <TabsContent value="locations">
-            <MasterTab
-              fetchAll={api.locations}
-              onCreate={name => api.createLocation({ name })}
-              onUpdate={(id, name) => api.updateLocation(id, { name })}
-              onDelete={api.deleteLocation}
-              field="name" label="Location" placeholder="e.g. Chennai Office"
-            />
-          </TabsContent>
-          <TabsContent value="shifts">
-            <ShiftsTab />
-          </TabsContent>
-        </Tabs>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {SERVICES.map(s => (
+            <button
+              key={s.key}
+              onClick={() => s.status === "link" ? router.push(s.href!) : setActive(s.key)}
+              className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-center hover:border-brand-300 hover:shadow-sm transition"
+            >
+              <div className="h-10 w-10 rounded-lg bg-brand-50 text-brand-600 grid place-items-center">
+                <s.icon className="h-5 w-5" />
+              </div>
+              <span className="text-sm font-medium text-slate-700">{s.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </>
   );

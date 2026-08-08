@@ -15,3 +15,11 @@ from .leave import (
     LeaveReview, LeaveCalendarItem,
 )
 from .provisioning import ProvisionCompanyIn
+from .user import UserCreateIn, UserRoleUpdateIn, UserOut, UserCreateOut
+from .services import (
+    OrgFileOut,
+    LetterRequestIn, LetterStatusIn, LetterRequestOut,
+    TaskIn, TaskStatusIn, TaskOut,
+    ExitDetailIn, ExitStatusIn, ExitDetailOut,
+)
+from .company import CompanyUpdateIn, CompanyOut

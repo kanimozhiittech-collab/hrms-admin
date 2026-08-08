@@ -20,6 +20,50 @@ NEW_COLUMNS = {
         "leave_request_id": "VARCHAR(36)",
         "source": "VARCHAR(20) DEFAULT 'web'",
     },
+    "departments": {
+        "code": "VARCHAR(50)",
+        "mail_alias": "VARCHAR(100)",
+        "lead_id": "VARCHAR(36)",
+        "parent_id": "VARCHAR(36)",
+    },
+    "designations": {
+        "code": "VARCHAR(50)",
+        "mail_alias": "VARCHAR(100)",
+    },
+    "work_locations": {
+        "code": "VARCHAR(50)",
+        "mail_alias": "VARCHAR(100)",
+        "address_line1": "VARCHAR(200)",
+        "address_line2": "VARCHAR(200)",
+        "city": "VARCHAR(100)",
+        "state": "VARCHAR(100)",
+        "country": "VARCHAR(100)",
+        "postal_code": "VARCHAR(20)",
+        "description": "TEXT",
+    },
+    "companies": {
+        "website": "VARCHAR(200)",
+        "org_type": "VARCHAR(100)",
+        "contact_person": "VARCHAR(100)",
+        "contact_number": "VARCHAR(30)",
+        "contact_email": "VARCHAR(200)",
+        "address_line1": "VARCHAR(200)",
+        "address_line2": "VARCHAR(200)",
+        "city": "VARCHAR(100)",
+        "state": "VARCHAR(100)",
+        "country": "VARCHAR(100)",
+        "postal_code": "VARCHAR(20)",
+        "logo_url": "VARCHAR(500)",
+    },
+    "shifts": {
+        "color": "VARCHAR(20)",
+    },
+    "org_files": {
+        "folder": "VARCHAR(100)",
+    },
+    "hr_tasks": {
+        "start_date": "DATE",
+    },
 }
 
 

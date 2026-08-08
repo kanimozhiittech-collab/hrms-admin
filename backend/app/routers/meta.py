@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import date
 from ..database import get_db
-from ..models import Department, Designation, WorkLocation, Shift, User, Holiday
+from ..models import Department, Designation, WorkLocation, Shift, User, Holiday, Employee
 from ..schemas import (
     DepartmentIn, DepartmentOut, DesignationIn, DesignationOut,
     LocationIn, LocationOut, ShiftIn, ShiftOut,
@@ -22,19 +22,40 @@ def _require_hr(user: User):
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
+def _dept_names(db: Session, company_id: str, depts: List[Department]) -> tuple[dict, dict]:
+    lead_ids = [d.lead_id for d in depts if d.lead_id]
+    parent_ids = [d.parent_id for d in depts if d.parent_id]
+    leads = db.query(Employee).filter(Employee.id.in_(lead_ids)).all() if lead_ids else []
+    parents = db.query(Department).filter(Department.id.in_(parent_ids)).all() if parent_ids else []
+    lead_map = {e.id: f"{e.first_name} {e.last_name}".strip() for e in leads}
+    parent_map = {p.id: p.name for p in parents}
+    return lead_map, parent_map
+
+
+def _dept_out(dept: Department, lead_map: dict, parent_map: dict) -> DepartmentOut:
+    return DepartmentOut(
+        id=dept.id, name=dept.name, code=dept.code, mail_alias=dept.mail_alias,
+        lead_id=dept.lead_id, lead_name=lead_map.get(dept.lead_id),
+        parent_id=dept.parent_id, parent_name=parent_map.get(dept.parent_id),
+    )
+
+
 @router.get("/departments", response_model=List[DepartmentOut])
 def list_departments(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    return db.query(Department).filter(Department.company_id == user.company_id).order_by(Department.name).all()
+    depts = db.query(Department).filter(Department.company_id == user.company_id).order_by(Department.name).all()
+    lead_map, parent_map = _dept_names(db, user.company_id, depts)
+    return [_dept_out(d, lead_map, parent_map) for d in depts]
 
 
 @router.post("/departments", response_model=DepartmentOut)
 def create_department(payload: DepartmentIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     _require_hr(user)
-    dept = Department(company_id=user.company_id, name=payload.name)
+    dept = Department(company_id=user.company_id, **payload.model_dump())
     db.add(dept)
     db.commit()
     db.refresh(dept)
-    return dept
+    lead_map, parent_map = _dept_names(db, user.company_id, [dept])
+    return _dept_out(dept, lead_map, parent_map)
 
 
 @router.put("/departments/{dept_id}", response_model=DepartmentOut)
@@ -43,10 +64,14 @@ def update_department(dept_id: str, payload: DepartmentIn, db: Session = Depends
     dept = db.query(Department).filter(Department.id == dept_id, Department.company_id == user.company_id).first()
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
-    dept.name = payload.name
+    if payload.parent_id == dept.id:
+        raise HTTPException(status_code=400, detail="A department cannot be its own parent")
+    for k, v in payload.model_dump().items():
+        setattr(dept, k, v)
     db.commit()
     db.refresh(dept)
-    return dept
+    lead_map, parent_map = _dept_names(db, user.company_id, [dept])
+    return _dept_out(dept, lead_map, parent_map)
 
 
 @router.delete("/departments/{dept_id}", status_code=204)
@@ -72,7 +97,7 @@ def list_designations(db: Session = Depends(get_db), user: User = Depends(curren
 @router.post("/designations", response_model=DesignationOut)
 def create_designation(payload: DesignationIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     _require_hr(user)
-    designation = Designation(company_id=user.company_id, title=payload.title)
+    designation = Designation(company_id=user.company_id, **payload.model_dump())
     db.add(designation)
     db.commit()
     db.refresh(designation)
@@ -87,7 +112,8 @@ def update_designation(designation_id: str, payload: DesignationIn, db: Session 
     ).first()
     if not designation:
         raise HTTPException(status_code=404, detail="Designation not found")
-    designation.title = payload.title
+    for k, v in payload.model_dump().items():
+        setattr(designation, k, v)
     db.commit()
     db.refresh(designation)
     return designation
@@ -118,7 +144,7 @@ def list_locations(db: Session = Depends(get_db), user: User = Depends(current_u
 @router.post("/locations", response_model=LocationOut)
 def create_location(payload: LocationIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     _require_hr(user)
-    location = WorkLocation(company_id=user.company_id, name=payload.name)
+    location = WorkLocation(company_id=user.company_id, **payload.model_dump())
     db.add(location)
     db.commit()
     db.refresh(location)
@@ -133,7 +159,8 @@ def update_location(location_id: str, payload: LocationIn, db: Session = Depends
     ).first()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    location.name = payload.name
+    for k, v in payload.model_dump().items():
+        setattr(location, k, v)
     db.commit()
     db.refresh(location)
     return location
