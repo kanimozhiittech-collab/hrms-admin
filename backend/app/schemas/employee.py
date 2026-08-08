@@ -131,36 +131,70 @@ class EmployeeOut(EmployeeIn):
 
 class DepartmentIn(BaseModel):
     name: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
+    lead_id: Optional[str] = None
+    parent_id: Optional[str] = None
 
 class DepartmentOut(BaseModel):
     id: str
     name: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
+    lead_id: Optional[str] = None
+    lead_name: Optional[str] = None
+    parent_id: Optional[str] = None
+    parent_name: Optional[str] = None
     class Config: from_attributes = True
 
 class DesignationIn(BaseModel):
     title: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
 
 class DesignationOut(BaseModel):
     id: str
     title: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
     class Config: from_attributes = True
 
 class LocationIn(BaseModel):
     name: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    postal_code: Optional[str] = None
+    description: Optional[str] = None
 
 class LocationOut(BaseModel):
     id: str
     name: str
+    code: Optional[str] = None
+    mail_alias: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    postal_code: Optional[str] = None
+    description: Optional[str] = None
     class Config: from_attributes = True
 
 class ShiftIn(BaseModel):
     name: str
     start_time: str
     end_time: str
+    color: Optional[str] = None
 
 class ShiftOut(BaseModel):
     id: str
     name: str
     start_time: str
     end_time: str
+    color: Optional[str] = None
     class Config: from_attributes = True

@@ -46,6 +46,50 @@ export const api = {
     return request<any>(`/api/employees/${id}/documents`, { method: "POST", body: form });
   },
 
+  // ── Files ──
+  listFiles: () => request<any[]>("/api/files"),
+  uploadFile: (name: string, description: string, folder: string, file: File) => {
+    const form = new FormData();
+    form.append("name", name);
+    form.append("description", description);
+    form.append("folder", folder);
+    form.append("file", file);
+    return request<any>("/api/files", { method: "POST", body: form });
+  },
+  deleteFile: (id: string) => request<void>(`/api/files/${id}`, { method: "DELETE" }),
+
+  // ── HR Letters ──
+  listLetters: () => request<any[]>("/api/letters"),
+  createLetter: (data: any) => request<any>("/api/letters", { method: "POST", body: JSON.stringify(data) }),
+  updateLetterStatus: (id: string, status: string) =>
+    request<any>(`/api/letters/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+
+  // ── Tasks ──
+  listHrTasks: () => request<any[]>("/api/hr-tasks"),
+  createHrTask: (data: any) => request<any>("/api/hr-tasks", { method: "POST", body: JSON.stringify(data) }),
+  updateHrTaskStatus: (id: string, status: string) =>
+    request<any>(`/api/hr-tasks/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+  deleteHrTask: (id: string) => request<void>(`/api/hr-tasks/${id}`, { method: "DELETE" }),
+
+  // ── General / Exit Details ──
+  listExitDetails: () => request<any[]>("/api/exit-details"),
+  createExitDetail: (data: any) => request<any>("/api/exit-details", { method: "POST", body: JSON.stringify(data) }),
+  updateExitStatus: (id: string, status: string) =>
+    request<any>(`/api/exit-details/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+
+  getCompany: () => request<any>("/api/company"),
+  updateCompany: (data: any) => request<any>("/api/company", { method: "PUT", body: JSON.stringify(data) }),
+  uploadCompanyLogo: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<any>("/api/company/logo", { method: "POST", body: form });
+  },
+
+  listUsers: () => request<any[]>("/api/users"),
+  createUser: (data: any) => request<any>("/api/users", { method: "POST", body: JSON.stringify(data) }),
+  updateUserRole: (id: string, role: string) => request<any>(`/api/users/${id}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+  toggleUserActive: (id: string) => request<any>(`/api/users/${id}/toggle`, { method: "PUT" }),
+
   departments: () => request<any[]>("/api/meta/departments"),
   createDepartment: (data: any) => request<any>("/api/meta/departments", { method: "POST", body: JSON.stringify(data) }),
   updateDepartment: (id: string, data: any) => request<any>(`/api/meta/departments/${id}`, { method: "PUT", body: JSON.stringify(data) }),

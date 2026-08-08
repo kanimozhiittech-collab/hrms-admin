@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime, func, Boolean
+from sqlalchemy import String, Integer, ForeignKey, DateTime, func, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 import uuid
@@ -12,24 +12,51 @@ class Company(Base):
     subdomain: Mapped[str] = mapped_column(String(50), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    website: Mapped[str | None] = mapped_column(String(200))
+    org_type: Mapped[str | None] = mapped_column(String(100))
+    contact_person: Mapped[str | None] = mapped_column(String(100))
+    contact_number: Mapped[str | None] = mapped_column(String(30))
+    contact_email: Mapped[str | None] = mapped_column(String(200))
+    address_line1: Mapped[str | None] = mapped_column(String(200))
+    address_line2: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+    postal_code: Mapped[str | None] = mapped_column(String(20))
+    logo_url: Mapped[str | None] = mapped_column(String(500))
 
 class Department(Base):
     __tablename__ = "departments"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"))
     name: Mapped[str] = mapped_column(String(100))
+    code: Mapped[str | None] = mapped_column(String(50))
+    mail_alias: Mapped[str | None] = mapped_column(String(100))
+    lead_id: Mapped[str | None] = mapped_column(ForeignKey("employees.id"))
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
 
 class Designation(Base):
     __tablename__ = "designations"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"))
     title: Mapped[str] = mapped_column(String(100))
+    code: Mapped[str | None] = mapped_column(String(50))
+    mail_alias: Mapped[str | None] = mapped_column(String(100))
 
 class WorkLocation(Base):
     __tablename__ = "work_locations"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"))
     name: Mapped[str] = mapped_column(String(100))
+    code: Mapped[str | None] = mapped_column(String(50))
+    mail_alias: Mapped[str | None] = mapped_column(String(100))
+    address_line1: Mapped[str | None] = mapped_column(String(200))
+    address_line2: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+    postal_code: Mapped[str | None] = mapped_column(String(20))
+    description: Mapped[str | None] = mapped_column(Text)
 
 class Shift(Base):
     __tablename__ = "shifts"
@@ -38,6 +65,7 @@ class Shift(Base):
     name: Mapped[str] = mapped_column(String(100))
     start_time: Mapped[str] = mapped_column(String(10))
     end_time: Mapped[str] = mapped_column(String(10))
+    color: Mapped[str | None] = mapped_column(String(20))
 
 class User(Base):
     __tablename__ = "users"
