@@ -136,13 +136,13 @@ function SelectField({ name, label, children }: any) {
 export default function NewEmployeePage() {
   const router = useRouter();
   const [tab, setTab] = useState("personal");
-  const [meta, setMeta] = useState<{depts: any[]; desigs: any[]; locs: any[]; shifts: any[]}>({depts:[],desigs:[],locs:[],shifts:[]});
+  const [meta, setMeta] = useState<{depts: any[]; desigs: any[]; locs: any[]; shifts: any[]; managers: any[]}>({depts:[],desigs:[],locs:[],shifts:[],managers:[]});
   const [docType, setDocType] = useState("Aadhaar");
   const [docFile, setDocFile] = useState<File | null>(null);
 
   useEffect(() => {
-    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
-      .then(([depts, desigs, locs, shifts]) => setMeta({ depts, desigs, locs, shifts }));
+    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
+      .then(([depts, desigs, locs, shifts, empRes]) => setMeta({ depts, desigs, locs, shifts, managers: empRes.items || [] }));
   }, []);
 
   const methods = useForm<FormValues>({
@@ -157,7 +157,7 @@ export default function NewEmployeePage() {
       education: [{ institute:"", degree:"", specialization:"", grade:"" } as any],
       experience: [],
       dependents: [],
-      emergency_contacts: [{ name:"", relationship_type:"", mobile:"", address:"" }],
+      emergency_contacts: [],
     } as any,
   });
 
@@ -286,6 +286,10 @@ export default function NewEmployeePage() {
                     <TextField name="date_of_joining" label="Date of Joining" type="date"/>
                     <TextField name="probation_end_date" label="Probation End" type="date"/>
                     <TextField name="confirmation_date" label="Confirmation Date" type="date"/>
+                    <SelectField name="reporting_manager_id" label="Reporting Manager">
+                      <option value="">—</option>
+                      {meta.managers.map(m => <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>)}
+                    </SelectField>
                     <SelectField name="work_location_id" label="Work Location">
                       <option value="">—</option>{meta.locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </SelectField>

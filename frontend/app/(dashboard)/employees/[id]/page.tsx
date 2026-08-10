@@ -67,11 +67,18 @@ export default function EmployeeDetailPage() {
   const [docType, setDocType] = useState("Aadhaar");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [meta, setMeta] = useState<{depts: any[]; desigs: any[]; locs: any[]; shifts: any[]; allEmployees: any[]}>(
+    { depts: [], desigs: [], locs: [], shifts: [], allEmployees: [] }
+  );
+  const [managerId, setManagerId] = useState("");
+  const [savingManager, setSavingManager] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      setEmployee(await api.getEmployee(employeeId));
+      const emp = await api.getEmployee(employeeId);
+      setEmployee(emp);
+      setManagerId(emp.reporting_manager_id || "");
     } catch (error: any) {
       toast.error(error.message || "Unable to load employee");
     } finally {
@@ -82,6 +89,37 @@ export default function EmployeeDetailPage() {
   useEffect(() => {
     if (employeeId) load();
   }, [employeeId]);
+
+  useEffect(() => {
+    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
+      .then(([depts, desigs, locs, shifts, empRes]) => setMeta({ depts, desigs, locs, shifts, allEmployees: empRes.items || [] }));
+  }, []);
+
+  function nameOf(list: any[], id: string | null, field = "name") {
+    if (!id) return null;
+    const found = list.find(x => x.id === id);
+    return found ? found[field] : null;
+  }
+
+  const manager = employee?.reporting_manager_id
+    ? meta.allEmployees.find(m => m.id === employee.reporting_manager_id)
+    : null;
+  const directReports = meta.allEmployees.filter(m => m.id !== employeeId && m.reporting_manager_id === employeeId);
+
+  async function saveManager() {
+    if (!employee) return;
+    setSavingManager(true);
+    try {
+      const { id, documents, created_at, updated_at, ...body } = employee;
+      await api.updateEmployee(employeeId, { ...body, reporting_manager_id: managerId || null });
+      toast.success("Reporting manager updated");
+      await load();
+    } catch (error: any) {
+      toast.error(error.message || "Unable to update reporting manager");
+    } finally {
+      setSavingManager(false);
+    }
+  }
 
   async function uploadDocument() {
     if (!file) {
@@ -154,21 +192,71 @@ export default function EmployeeDetailPage() {
               <Section
                 title="Job"
                 fields={[
-                  ["Department ID", employee.department_id],
-                  ["Designation ID", employee.designation_id],
+                  ["Department", nameOf(meta.depts, employee.department_id)],
+                  ["Designation", nameOf(meta.desigs, employee.designation_id, "title")],
                   ["Employee Type", employee.employee_type],
                   ["Date of Joining", employee.date_of_joining],
                   ["Probation End Date", employee.probation_end_date],
                   ["Confirmation Date", employee.confirmation_date],
-                  ["Reporting Manager ID", employee.reporting_manager_id],
-                  ["Work Location ID", employee.work_location_id],
-                  ["Shift ID", employee.shift_id],
+                  ["Work Location", nameOf(meta.locs, employee.work_location_id)],
+                  ["Shift", nameOf(meta.shifts, employee.shift_id)],
                   ["Source of Hire", employee.source_of_hire],
                   ["Tags", employee.tags],
                   ["Status", employee.status],
                   ["Exit Date", employee.exit_date],
                 ]}
               />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Reporting Manager &amp; Team</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1 space-y-1.5">
+                      <Label>Reporting Manager</Label>
+                      <Select value={managerId} onChange={(event) => setManagerId(event.target.value)}>
+                        <option value="">— None —</option>
+                        {meta.allEmployees.filter(m => m.id !== employeeId).map(m => (
+                          <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>
+                        ))}
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={saveManager}
+                      disabled={savingManager || managerId === (employee.reporting_manager_id || "")}
+                    >
+                      {savingManager ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                  {manager && (
+                    <p className="text-xs text-slate-500">
+                      Currently reports to <span className="font-medium text-slate-700">{manager.first_name} {manager.last_name}</span>.
+                    </p>
+                  )}
+
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-slate-500">Direct Reports ({directReports.length})</p>
+                    {directReports.length ? (
+                      <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                        {directReports.map(r => (
+                          <Link
+                            key={r.id}
+                            href={`/employees/${r.id}`}
+                            className="flex items-center justify-between p-3 text-sm hover:bg-slate-50"
+                          >
+                            <span className="font-medium text-slate-900">{r.first_name} {r.last_name}</span>
+                            <span className="text-xs text-slate-500">{r.designation || r.emp_code}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyBlock text="No one reports to this employee yet." />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               <Section
                 title="Compensation"

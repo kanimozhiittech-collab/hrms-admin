@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
+from sqlalchemy.exc import IntegrityError
 from pathlib import Path
 import shutil, tempfile, uuid
 from typing import Optional
@@ -74,7 +75,7 @@ def list_employees(
         work_email=r.work_email, mobile=r.mobile,
         department=dept_map.get(r.department_id), designation=desig_map.get(r.designation_id),
         employee_type=r.employee_type, status=r.status, photo_url=r.photo_url,
-        date_of_joining=r.date_of_joining,
+        date_of_joining=r.date_of_joining, reporting_manager_id=r.reporting_manager_id,
     ) for r in rows]
     return EmployeeListResponse(items=items, total=total, page=page, page_size=page_size)
 
@@ -151,7 +152,18 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
     _require_hr(user)
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
-    db.delete(e); db.commit()
+
+    # Detach dependents before deleting, so we don't crash on FK constraints
+    # for things that shouldn't block a deletion outright.
+    db.query(User).filter(User.employee_id == emp_id).delete()
+    db.query(Employee).filter(Employee.reporting_manager_id == emp_id).update({"reporting_manager_id": None})
+
+    try:
+        db.delete(e)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "This employee is referenced by other records and cannot be deleted")
 
 
 @router.post("/{emp_id}/documents", response_model=DocumentOut)

@@ -117,6 +117,7 @@ class EmployeeListItem(BaseModel):
     status: str
     photo_url: Optional[str] = None
     date_of_joining: Optional[date] = None
+    reporting_manager_id: Optional[str] = None
 
 class EmployeeListResponse(BaseModel):
     items: List[EmployeeListItem]

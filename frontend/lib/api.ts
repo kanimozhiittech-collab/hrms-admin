@@ -39,6 +39,7 @@ export const api = {
   },
   createEmployee: (data: any) => request<any>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
   getEmployee: (id: string) => request<any>(`/api/employees/${id}`),
+  updateEmployee: (id: string, data: any) => request<any>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   uploadEmployeeDocument: (id: string, docType: string, file: File) => {
     const form = new FormData();
     form.append("doc_type", docType);

@@ -11,7 +11,6 @@ import { api } from "@/lib/api";
 import { Plus, X, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 
 const STATUS_TONE: Record<string, any> = {
   approved: "green", rejected: "red", pending: "amber", cancelled: "slate",
@@ -23,8 +22,7 @@ function fmtDate(d: string) {
 
 export default function LeavesPage() {
   const now = new Date();
-  const [role, setRole] = useState("");
-  const isHR = HR_ROLES.includes(role);
+  const [canApprove, setCanApprove] = useState(false);
   const [tab, setTab] = useState<"my" | "approvals" | "calendar">("my");
 
   const [balances, setBalances] = useState<any[]>([]);
@@ -38,7 +36,13 @@ export default function LeavesPage() {
   const [showApply, setShowApply] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
 
-  useEffect(() => { api.me().then(m => setRole(m.role)).catch(() => {}); }, []);
+  // Show the Approvals tab for HR/Admin, and for any manager who has at least
+  // one direct report — the backend scopes /requests/team accordingly.
+  useEffect(() => {
+    api.teamLeaveRequests("pending")
+      .then(r => { setPending(r); setCanApprove(true); })
+      .catch(() => setCanApprove(false));
+  }, []);
 
   async function loadMy() {
     const [b, t, r] = await Promise.all([api.leaveBalance(), api.leaveTypes(), api.myLeaveRequests()]);
@@ -58,7 +62,7 @@ export default function LeavesPage() {
 
   const tabs: { key: typeof tab; label: string }[] = [
     { key: "my", label: "My Leaves" },
-    ...(isHR ? [{ key: "approvals" as const, label: "Approvals" }] : []),
+    ...(canApprove ? [{ key: "approvals" as const, label: "Approvals" }] : []),
     { key: "calendar", label: "Team Calendar" },
   ];
 
