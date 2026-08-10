@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 
 const DOC_TYPES = ["Aadhaar", "PAN", "Passport", "Resume", "OfferLetter", "Certificate", "Other"];
+const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 
 function value(v: any) {
   return v === null || v === undefined || v === "" ? "-" : String(v);
@@ -72,6 +73,10 @@ export default function EmployeeDetailPage() {
   );
   const [managerId, setManagerId] = useState("");
   const [savingManager, setSavingManager] = useState(false);
+  const [isHR, setIsHR] = useState(false);
+  const [balances, setBalances] = useState<any[]>([]);
+  const [balanceDrafts, setBalanceDrafts] = useState<Record<string, string>>({});
+  const [savingBalanceId, setSavingBalanceId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -94,6 +99,43 @@ export default function EmployeeDetailPage() {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
       .then(([depts, desigs, locs, shifts, empRes]) => setMeta({ depts, desigs, locs, shifts, allEmployees: empRes.items || [] }));
   }, []);
+
+  useEffect(() => {
+    api.me().then(m => setIsHR(HR_ROLES.includes(m.role))).catch(() => {});
+  }, []);
+
+  async function loadBalances() {
+    try {
+      const b = await api.employeeLeaveBalance(employeeId);
+      setBalances(b);
+      setBalanceDrafts(Object.fromEntries(b.map((x: any) => [x.leave_type_id, String(x.allocated)])));
+    } catch {
+      // employee may have no leave types configured yet
+    }
+  }
+
+  useEffect(() => {
+    if (employeeId && isHR) loadBalances();
+  }, [employeeId, isHR]);
+
+  async function saveBalance(leaveTypeId: string) {
+    const raw = balanceDrafts[leaveTypeId];
+    const allocated = Number(raw);
+    if (Number.isNaN(allocated) || allocated < 0) {
+      toast.error("Enter a valid number of days");
+      return;
+    }
+    setSavingBalanceId(leaveTypeId);
+    try {
+      await api.adjustLeaveBalance(employeeId, leaveTypeId, allocated);
+      toast.success("Leave balance updated");
+      await loadBalances();
+    } catch (error: any) {
+      toast.error(error.message || "Unable to update leave balance");
+    } finally {
+      setSavingBalanceId(null);
+    }
+  }
 
   function nameOf(list: any[], id: string | null, field = "name") {
     if (!id) return null;
@@ -257,6 +299,56 @@ export default function EmployeeDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {isHR && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Leave Balances</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {balances.length ? (
+                      <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                        {balances.map((b: any) => (
+                          <div key={b.leave_type_id} className="flex items-center justify-between gap-3 p-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-900">{b.leave_type_name}</p>
+                                <p className="text-xs text-slate-500">{b.used} used · {b.available} available</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                className="w-20"
+                                value={balanceDrafts[b.leave_type_id] ?? ""}
+                                onChange={(event) =>
+                                  setBalanceDrafts({ ...balanceDrafts, [b.leave_type_id]: event.target.value })
+                                }
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => saveBalance(b.leave_type_id)}
+                                disabled={
+                                  savingBalanceId === b.leave_type_id ||
+                                  balanceDrafts[b.leave_type_id] === String(b.allocated)
+                                }
+                              >
+                                {savingBalanceId === b.leave_type_id ? "Saving..." : "Save"}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyBlock text="No leave types configured yet." />
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <Section
                 title="Compensation"

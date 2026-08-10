@@ -151,6 +151,12 @@ export const api = {
   updateLeaveType: (id: string, data: any) =>
     request<any>(`/api/leave/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   leaveBalance: (year?: number) => request<any[]>(`/api/leave/balance${year ? `?year=${year}` : ""}`),
+  employeeLeaveBalance: (employeeId: string, year?: number) =>
+    request<any[]>(`/api/leave/balance/${employeeId}${year ? `?year=${year}` : ""}`),
+  adjustLeaveBalance: (employeeId: string, leaveTypeId: string, allocated: number, year?: number) =>
+    request<any>(`/api/leave/balance/${employeeId}/${leaveTypeId}`, {
+      method: "PUT", body: JSON.stringify({ allocated, year }),
+    }),
   applyLeave: (data: any) => request<any>("/api/leave/requests", { method: "POST", body: JSON.stringify(data) }),
   myLeaveRequests: (params: Record<string, any> = {}) => {
     const q = new URLSearchParams();

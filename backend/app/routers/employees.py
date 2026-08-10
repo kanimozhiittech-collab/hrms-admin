@@ -8,7 +8,10 @@ import shutil, tempfile, uuid
 from typing import Optional
 from ..database import get_db
 from ..models import (Employee, EmployeeAddress, EducationRecord, ExperienceRecord,
-                      Dependent, EmergencyContact, EmployeeDocument, Department, Designation, User)
+                      Dependent, EmergencyContact, EmployeeDocument, Department, Designation, User,
+                      LeaveBalance, LeaveRequest)
+from ..models.attendance import AttendanceLog, RegularizationRequest
+from ..models.services import OrgFile
 from ..schemas import EmployeeIn, EmployeeOut, EmployeeListResponse, EmployeeListItem, DocumentOut
 from ..core.security import hash_password
 from .deps import current_user
@@ -155,8 +158,21 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
 
     # Detach dependents before deleting, so we don't crash on FK constraints
     # for things that shouldn't block a deletion outright.
-    db.query(User).filter(User.employee_id == emp_id).delete()
+    login = db.query(User).filter(User.employee_id == emp_id).first()
     db.query(Employee).filter(Employee.reporting_manager_id == emp_id).update({"reporting_manager_id": None})
+    if login:
+        # This employee's login may have reviewed other people's leave/regularization
+        # requests as a manager — detach those before the login row itself is deleted.
+        db.query(LeaveRequest).filter(LeaveRequest.reviewed_by == login.id).update({"reviewed_by": None})
+        db.query(RegularizationRequest).filter(RegularizationRequest.reviewed_by == login.id).update({"reviewed_by": None})
+        db.query(OrgFile).filter(OrgFile.uploaded_by == login.id).update({"uploaded_by": None})
+    db.query(AttendanceLog).filter(AttendanceLog.employee_id == emp_id).delete()
+    db.query(RegularizationRequest).filter(RegularizationRequest.employee_id == emp_id).delete()
+    db.query(LeaveRequest).filter(LeaveRequest.employee_id == emp_id).delete()
+    db.query(LeaveBalance).filter(LeaveBalance.employee_id == emp_id).delete()
+    if login:
+        db.delete(login)
+        db.flush()  # SQLAlchemy won't auto-order this delete before the Employee's without a flush
 
     try:
         db.delete(e)
