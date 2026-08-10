@@ -10,7 +10,7 @@ from ..models import (
 from ..models.attendance import ATT_ON_LEAVE, ATT_HALF_DAY
 from ..models.leave import LR_PENDING, LR_APPROVED, LR_REJECTED, LR_CANCELLED
 from ..schemas.leave import (
-    LeaveTypeIn, LeaveTypeOut, LeaveBalanceOut, LeaveRequestIn, LeaveRequestOut,
+    LeaveTypeIn, LeaveTypeOut, LeaveBalanceOut, LeaveBalanceAdjustIn, LeaveRequestIn, LeaveRequestOut,
     LeaveReview, LeaveCalendarItem,
 )
 from ..core.worktime import working_days, iter_dates, is_weekend
@@ -241,6 +241,41 @@ def employee_balance(
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
     return _balances_for(db, emp, year)
+
+
+@router.put("/balance/{employee_id}/{leave_type_id}", response_model=LeaveBalanceOut)
+def adjust_balance(
+    employee_id: str,
+    leave_type_id: str,
+    payload: LeaveBalanceAdjustIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """HR override: set a specific employee's allocated days for a leave type/year,
+    independent of the company-wide LeaveType.days_per_year default."""
+    if not _is_hr(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    year = payload.year or date.today().year
+    emp = db.query(Employee).filter(
+        Employee.id == employee_id, Employee.company_id == user.company_id
+    ).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    lt = db.query(LeaveType).filter(
+        LeaveType.id == leave_type_id, LeaveType.company_id == user.company_id
+    ).first()
+    if not lt:
+        raise HTTPException(status_code=404, detail="Leave type not found")
+
+    bal = _get_or_create_balance(db, emp, lt, year)
+    bal.allocated = payload.allocated
+    db.commit()
+    db.refresh(bal)
+    return LeaveBalanceOut(
+        id=bal.id, leave_type_id=lt.id, leave_type_name=lt.name, leave_type_code=lt.code,
+        color=lt.color, year=year, allocated=bal.allocated, used=bal.used,
+        pending=bal.pending, carried_forward=bal.carried_forward, available=bal.available,
+    )
 
 
 # ──────────────────────────────────────────────

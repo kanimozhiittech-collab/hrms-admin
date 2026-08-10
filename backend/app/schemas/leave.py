@@ -54,6 +54,11 @@ class LeaveBalanceOut(BaseModel):
     available: float
 
 
+class LeaveBalanceAdjustIn(BaseModel):
+    allocated: float
+    year: Optional[int] = None
+
+
 # ── Leave requests ──
 class LeaveRequestIn(BaseModel):
     leave_type_id: str
