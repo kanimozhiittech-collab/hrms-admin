@@ -25,6 +25,22 @@ def _is_hr(user: User) -> bool:
     return user.role in HR_ROLES
 
 
+def _own_employee_id(db: Session, user: User) -> Optional[str]:
+    emp = _resolve_employee(db, user)
+    return emp.id if emp else None
+
+
+def _can_review(db: Session, user: User, req: LeaveRequest) -> bool:
+    """HR can review anyone's request; a reporting manager can review their own reports'."""
+    if _is_hr(user):
+        return True
+    my_emp_id = _own_employee_id(db, user)
+    if not my_emp_id:
+        return False
+    target = db.query(Employee).filter(Employee.id == req.employee_id).first()
+    return bool(target and target.reporting_manager_id == my_emp_id)
+
+
 def _resolve_employee(db: Session, user: User) -> Employee | None:
     emp = None
     if user.employee_id:
@@ -346,9 +362,17 @@ def team_requests(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if not _is_hr(user):
-        raise HTTPException(status_code=403, detail="Not authorized")
     q = db.query(LeaveRequest).filter(LeaveRequest.company_id == user.company_id)
+    if not _is_hr(user):
+        my_emp_id = _own_employee_id(db, user)
+        report_ids = [
+            e.id for e in db.query(Employee.id)
+            .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
+            .all()
+        ] if my_emp_id else []
+        if not report_ids:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        q = q.filter(LeaveRequest.employee_id.in_(report_ids))
     if status and status != "all":
         q = q.filter(LeaveRequest.status == status)
     reqs = q.order_by(LeaveRequest.created_at.desc()).all()
@@ -387,13 +411,13 @@ def approve_request(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if not _is_hr(user):
-        raise HTTPException(status_code=403, detail="Not authorized")
     req = db.query(LeaveRequest).filter(
         LeaveRequest.id == req_id, LeaveRequest.company_id == user.company_id
     ).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    if not _can_review(db, user, req):
+        raise HTTPException(status_code=403, detail="Not authorized")
     if req.status != LR_PENDING:
         raise HTTPException(status_code=400, detail="Request already reviewed")
 
@@ -427,13 +451,13 @@ def reject_request(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if not _is_hr(user):
-        raise HTTPException(status_code=403, detail="Not authorized")
     req = db.query(LeaveRequest).filter(
         LeaveRequest.id == req_id, LeaveRequest.company_id == user.company_id
     ).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    if not _can_review(db, user, req):
+        raise HTTPException(status_code=403, detail="Not authorized")
     if req.status != LR_PENDING:
         raise HTTPException(status_code=400, detail="Request already reviewed")
 
