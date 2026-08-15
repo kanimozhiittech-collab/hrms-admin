@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { Plus, X, CheckCircle2, XCircle, CalendarDays, Trash2, Pencil } from "lucide-react";
+import { Plus, X, CheckCircle2, XCircle, CalendarDays, Trash2, Pencil, Search } from "lucide-react";
 import { Modal, ModalField } from "@/components/ui/modal";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -41,6 +41,8 @@ export default function LeavesPage() {
   const [policies, setPolicies] = useState<any[]>([]);
   const [showPolicyForm, setShowPolicyForm] = useState(false);
   const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
+  const [holidaySearch, setHolidaySearch] = useState("");
+  const [policySearch, setPolicySearch] = useState("");
 
   const [showApply, setShowApply] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
@@ -78,6 +80,12 @@ export default function LeavesPage() {
     if (!confirm("Delete this holiday?")) return;
     await api.deleteHoliday(id); await loadHolidays();
   }
+
+  const filteredHolidays = holidays.filter(h => h.name.toLowerCase().includes(holidaySearch.toLowerCase()));
+  const filteredPolicies = policies.filter(p =>
+    p.name.toLowerCase().includes(policySearch.toLowerCase()) ||
+    (p.code || "").toLowerCase().includes(policySearch.toLowerCase())
+  );
 
   const tabs: { key: typeof tab; label: string }[] = [
     { key: "my", label: "My Leaves" },
@@ -246,14 +254,20 @@ export default function LeavesPage() {
         {/* ── HOLIDAYS ── */}
         {tab === "holidays" && (
           <div className="space-y-3">
-            <Select value={holidayYear} onChange={e => setHolidayYear(+e.target.value)} className="max-w-[120px]">
-              {[holidayYear + 1, holidayYear, holidayYear - 1].map(y => <option key={y} value={y}>{y}</option>)}
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={holidayYear} onChange={e => setHolidayYear(+e.target.value)} className="max-w-[120px]">
+                {[holidayYear + 1, holidayYear, holidayYear - 1].map(y => <option key={y} value={y}>{y}</option>)}
+              </Select>
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                <Input placeholder="Search holidays…" value={holidaySearch} onChange={e => setHolidaySearch(e.target.value)} className="pl-8 h-8 text-sm" />
+              </div>
+            </div>
           <Card>
             <div className="px-4 py-3 border-b border-slate-100 font-medium text-slate-800">Company Holidays — {holidayYear}</div>
             <div className="divide-y divide-slate-100">
-              {holidays.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No holidays added for {holidayYear}.</div>}
-              {holidays.map(h => (
+              {filteredHolidays.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No holidays found for {holidayYear}.</div>}
+              {filteredHolidays.map(h => (
                 <div key={h.id} className="px-4 py-3 flex items-center gap-3">
                   <div className="flex-1">
                     <div className="text-sm font-medium text-slate-800">{h.name}</div>
@@ -274,6 +288,11 @@ export default function LeavesPage() {
 
         {/* ── LEAVE POLICIES ── */}
         {tab === "policies" && isHR && (
+          <div className="space-y-3">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              <Input placeholder="Search policies…" value={policySearch} onChange={e => setPolicySearch(e.target.value)} className="pl-8 h-8 text-sm" />
+            </div>
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -289,8 +308,8 @@ export default function LeavesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {policies.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No leave policies yet.</td></tr>}
-                  {policies.map(p => (
+                  {filteredPolicies.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No leave policies found.</td></tr>}
+                  {filteredPolicies.map(p => (
                     <tr key={p.id} className="border-t border-slate-100">
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 font-medium text-slate-900">
@@ -314,6 +333,7 @@ export default function LeavesPage() {
               </table>
             </div>
           </Card>
+          </div>
         )}
       </div>
 

@@ -635,8 +635,20 @@ function WidgetCard({
   );
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
 function DashboardWidgets() {
   const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
+  const [orgFiles, setOrgFiles] = useState<any[]>([]);
+  const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.listFiles().then(setOrgFiles).catch(() => {});
+    api.me().then(m => {
+      if (!m.employee_id) return;
+      return api.getEmployee(m.employee_id).then(emp => setEmployeeFiles(emp.documents || []));
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -743,7 +755,7 @@ function DashboardWidgets() {
           icon={Folder}
           right={
             <span className="text-xs text-slate-500">
-              Total Files <Badge className="ml-1">0</Badge>
+              Total Files <Badge className="ml-1">{orgFiles.length + employeeFiles.length}</Badge>
             </span>
           }
         >
@@ -769,7 +781,39 @@ function DashboardWidgets() {
               Employee Files
             </button>
           </div>
-          <EmptyState text={fileTab === "organization" ? "No organization files found" : "No employee files found"} />
+          {fileTab === "organization" ? (
+            orgFiles.length ? (
+              <ul className="divide-y divide-slate-200">
+                {orgFiles.map((f: any) => (
+                  <li key={f.id} className="flex items-center justify-between gap-3 py-2 first:pt-2 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{f.name}</p>
+                      {f.folder && <p className="text-xs text-slate-500">{f.folder}</p>}
+                    </div>
+                    <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                      View
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : <EmptyState text="No organization files found" />
+          ) : (
+            employeeFiles.length ? (
+              <ul className="divide-y divide-slate-200">
+                {employeeFiles.map((f: any) => (
+                  <li key={f.id} className="flex items-center justify-between gap-3 py-2 first:pt-2 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{f.file_name}</p>
+                      <p className="text-xs text-slate-500">{f.doc_type}</p>
+                    </div>
+                    <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                      View
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : <EmptyState text="No employee files found" />
+          )}
         </WidgetCard>
 
         <WidgetCard

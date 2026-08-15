@@ -13,7 +13,7 @@ import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye,
+  Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye, Search,
   Users, CalendarDays, Clock, FileText, Building2,
   Mail, ListChecks, Settings2,
 } from "lucide-react";
@@ -55,6 +55,15 @@ function useManageAccountsEmployeeOptions() {
   return options;
 }
 
+function SearchInput({ value, onChange, placeholder = "Search…" }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="relative w-full max-w-xs">
+      <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+      <Input placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="pl-8 h-8 text-sm" />
+    </div>
+  );
+}
+
 function ShiftsTab() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,12 +71,15 @@ function ShiftsTab() {
   const [form, setForm] = useState({ name: "", start_time: "09:00", end_time: "18:00", color: "#2563eb" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
     try { setItems(await api.shifts()); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
   function resetForm() {
     setForm({ name: "", start_time: "09:00", end_time: "18:00", color: "#2563eb" });
@@ -90,8 +102,9 @@ function ShiftsTab() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} shift{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} shift{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search shifts…" />
         <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4" />Add Shift
         </Button>
@@ -99,10 +112,10 @@ function ShiftsTab() {
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No shifts yet.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No shifts found.</div>
         )}
-        {items.map(s => (
+        {filtered.map(s => (
           <div key={s.id} className="px-4 py-3 flex items-center gap-3">
             <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.color || "#94a3b8" }} />
             <span className="flex-1 text-sm text-slate-900">{s.name}</span>
@@ -198,6 +211,7 @@ function DepartmentsService() {
   const [form, setForm] = useState({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -206,6 +220,11 @@ function DepartmentsService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter(d =>
+    d.name.toLowerCase().includes(search.toLowerCase()) ||
+    (d.code || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   function resetForm() {
     setForm({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
@@ -255,8 +274,9 @@ function DepartmentsService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} department{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} department{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search departments…" />
         <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4" />Add Department
         </Button>
@@ -264,10 +284,10 @@ function DepartmentsService() {
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No departments yet.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No departments found.</div>
         )}
-        {items.map(d => (
+        {filtered.map(d => (
           <div key={d.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{d.name}{d.code ? ` (${d.code})` : ""}</div>
@@ -353,6 +373,7 @@ function DesignationsService() {
   const [form, setForm] = useState({ title: "", code: "", mail_alias: "" });
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -361,6 +382,11 @@ function DesignationsService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter(d =>
+    d.title.toLowerCase().includes(search.toLowerCase()) ||
+    (d.code || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   function resetForm() {
     setForm({ title: "", code: "", mail_alias: "" });
@@ -405,8 +431,9 @@ function DesignationsService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} designation{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} designation{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search designations…" />
         <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4" />Add Designation
         </Button>
@@ -414,10 +441,10 @@ function DesignationsService() {
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No designations yet.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No designations found.</div>
         )}
-        {items.map(d => (
+        {filtered.map(d => (
           <div key={d.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{d.title}{d.code ? ` (${d.code})` : ""}</div>
@@ -489,6 +516,7 @@ function LocationsService() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(BLANK_LOCATION);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -497,6 +525,11 @@ function LocationsService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter(l =>
+    l.name.toLowerCase().includes(search.toLowerCase()) ||
+    (l.city || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   function resetForm() {
     setForm(BLANK_LOCATION);
@@ -537,8 +570,9 @@ function LocationsService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} location{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} location{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search locations…" />
         <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="h-4 w-4" />Add Location
         </Button>
@@ -546,10 +580,10 @@ function LocationsService() {
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No locations yet.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No locations found.</div>
         )}
-        {items.map(l => (
+        {filtered.map(l => (
           <div key={l.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{l.name}{l.code ? ` (${l.code})` : ""}</div>
@@ -788,6 +822,7 @@ function UsersService() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editForm, setEditForm] = useState({ email: "", employee_id: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
 
@@ -798,6 +833,11 @@ function UsersService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter((u: any) =>
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
+    (u.employee_name || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function add() {
     if (!form.email.trim()) return;
@@ -859,8 +899,9 @@ function UsersService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} user account{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} user account{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search accounts…" />
         <Button size="sm" onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4" />Add User
         </Button>
@@ -894,10 +935,10 @@ function UsersService() {
           </thead>
           <tbody>
             {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No user accounts yet.</td></tr>
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No user accounts found.</td></tr>
             )}
-            {items.map(u => (
+            {filtered.map(u => (
               <tr key={u.id} className="border-t border-slate-100">
                 <td className="px-4 py-3 text-slate-900">{u.email}</td>
                 <td className="px-4 py-3 text-slate-600">{u.employee_name || "—"}</td>
@@ -1009,6 +1050,7 @@ function FilesService() {
   const [folder, setFolder] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1017,6 +1059,11 @@ function FilesService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter((f: any) =>
+    f.name.toLowerCase().includes(search.toLowerCase()) ||
+    (f.folder || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function upload() {
     if (!name.trim() || !file) return;
@@ -1038,17 +1085,18 @@ function FilesService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} file{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} file{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search files…" />
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add File</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No organization files added.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No organization files found.</div>
         )}
-        {items.map(f => (
+        {filtered.map(f => (
           <div key={f.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900 truncate">
@@ -1104,6 +1152,7 @@ function HrLettersService() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ employee_id: "", letter_type: "Bonafide Letter", date_of_request: new Date().toISOString().slice(0, 10), reason: "" });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1112,6 +1161,11 @@ function HrLettersService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter((r: any) =>
+    (r.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (r.letter_type || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function add() {
     if (!form.employee_id) return;
@@ -1129,8 +1183,9 @@ function HrLettersService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} request{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} request{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search requests…" />
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Request</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
@@ -1147,10 +1202,10 @@ function HrLettersService() {
           </thead>
           <tbody>
             {loading && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No records found.</td></tr>
             )}
-            {items.map(r => (
+            {filtered.map(r => (
               <tr key={r.id} className="border-t border-slate-100">
                 <td className="px-4 py-3 text-slate-900">{r.employee_name || "—"}</td>
                 <td className="px-4 py-3 text-slate-600">{r.letter_type}</td>
@@ -1220,6 +1275,7 @@ function TasksService() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", owner_id: "", start_date: "", due_date: "", priority: "Moderate" });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1228,6 +1284,11 @@ function TasksService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter((t: any) =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    (t.owner_name || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function add() {
     if (!form.name.trim()) return;
@@ -1259,17 +1320,18 @@ function TasksService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} task{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} task{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search tasks…" />
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Task</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
       <div className="divide-y divide-slate-100">
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
-        {!loading && items.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-slate-400">No tasks to list here.</div>
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No tasks found.</div>
         )}
-        {items.map(t => (
+        {filtered.map(t => (
           <div key={t.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900 truncate">{t.name}</div>
@@ -1344,6 +1406,7 @@ function GeneralService() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ employee_id: "", separation_date: new Date().toISOString().slice(0, 10), interviewer_id: "", reason: "", feedback: "" });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1352,6 +1415,10 @@ function GeneralService() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const filtered = items.filter((r: any) =>
+    (r.employee_name || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   async function add() {
     if (!form.employee_id) return;
@@ -1373,8 +1440,9 @@ function GeneralService() {
 
   return (
     <Card>
-      <div className="p-4 flex items-center justify-between border-b border-slate-100">
-        <div className="text-sm text-slate-500">{items.length} exit record{items.length === 1 ? "" : "s"}</div>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{filtered.length} exit record{filtered.length === 1 ? "" : "s"}</div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search exit records…" />
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Exit Details</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
@@ -1392,10 +1460,10 @@ function GeneralService() {
           </thead>
           <tbody>
             {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No records found.</td></tr>
             )}
-            {items.map(r => (
+            {filtered.map(r => (
               <tr key={r.id} className="border-t border-slate-100">
                 <td className="px-4 py-3 text-slate-900">{r.employee_name || "—"}</td>
                 <td className="px-4 py-3 text-slate-600">{r.separation_date}</td>
