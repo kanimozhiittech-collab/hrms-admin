@@ -6,18 +6,24 @@ from typing import List
 
 from ..database import get_db
 from ..models import User, Employee
-from ..schemas import UserCreateIn, UserRoleUpdateIn, UserOut, UserCreateOut
+from ..schemas import UserCreateIn, UserRoleUpdateIn, UserProfileUpdateIn, UserOut, UserCreateOut
 from ..core.security import hash_password
 from .deps import current_user
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 ASSIGNABLE_ROLES = {"company_admin", "hr_manager", "employee"}
+HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
 
 
 def _require_admin(user: User):
     if user.role not in {"super_admin", "company_admin"}:
         raise HTTPException(403, "Only company admins can manage user accounts")
+
+
+def _require_hr(user: User):
+    if user.role not in HR_ROLES:
+        raise HTTPException(403, "Not authorized")
 
 
 def _gen_password() -> str:
@@ -39,7 +45,7 @@ def _to_out(db: Session, target: User) -> UserOut:
 
 @router.get("", response_model=List[UserOut])
 def list_users(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_admin(user)
+    _require_hr(user)
     users = db.query(User).filter(User.company_id == user.company_id).order_by(User.email).all()
     emp_ids = [u.employee_id for u in users if u.employee_id]
     emps = db.query(Employee).filter(Employee.id.in_(emp_ids)).all() if emp_ids else []
@@ -74,6 +80,32 @@ def create_user(body: UserCreateIn, db: Session = Depends(get_db), user: User = 
         id=new_user.id, email=new_user.email, role=new_user.role, is_active=new_user.is_active,
         employee_id=None, employee_name=None, temp_password=temp_password,
     )
+
+
+@router.put("/{user_id}", response_model=UserOut)
+def update_profile(
+    user_id: str, body: UserProfileUpdateIn,
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    _require_admin(user)
+    target = db.query(User).filter(User.id == user_id, User.company_id == user.company_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if body.email != target.email:
+        existing = db.query(User).filter(User.email == body.email).first()
+        if existing and existing.id != target.id:
+            raise HTTPException(400, "A user with this email already exists")
+    if body.employee_id:
+        emp = db.query(Employee).filter(
+            Employee.id == body.employee_id, Employee.company_id == user.company_id
+        ).first()
+        if not emp:
+            raise HTTPException(404, "Employee not found")
+    target.email = body.email
+    target.employee_id = body.employee_id
+    db.commit()
+    db.refresh(target)
+    return _to_out(db, target)
 
 
 @router.put("/{user_id}/role", response_model=UserOut)

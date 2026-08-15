@@ -13,7 +13,7 @@ import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  Plus, Trash2, X, Pencil, ArrowLeft, Download,
+  Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye,
   Users, CalendarDays, Clock, FileText, Building2,
   Mail, ListChecks, Settings2,
 } from "lucide-react";
@@ -39,6 +39,20 @@ function useEmployeeOptions() {
     api.listEmployees({ page_size: 100 }).then(res => setEmployees(res.items || [])).catch(() => {});
   }, []);
   return employees;
+}
+
+/** Employees who have a Manage Accounts login linked — used for Department Head,
+ * so a "head" always corresponds to someone with system access. */
+function useManageAccountsEmployeeOptions() {
+  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    api.listUsers().then(users => setOptions(
+      users
+        .filter((u: any) => u.employee_id && u.employee_name)
+        .map((u: any) => ({ id: u.employee_id, label: `${u.employee_name} (${u.email})` }))
+    )).catch(() => {});
+  }, []);
+  return options;
 }
 
 function ShiftsTab() {
@@ -130,8 +144,52 @@ function ShiftsTab() {
   );
 }
 
+function ReassignDeleteModal({
+  title, itemLabel, count, options, onCancel, onConfirm,
+}: {
+  title: string; itemLabel: string; count: number;
+  options: { id: string; label: string }[];
+  onCancel: () => void;
+  onConfirm: (targetId: string | null) => Promise<void>;
+}) {
+  const [target, setTarget] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function confirm() {
+    setBusy(true); setErr("");
+    try { await onConfirm(target || null); }
+    catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Modal
+      title={title}
+      onClose={onCancel}
+      footer={<>
+        <Button onClick={confirm} disabled={busy} className="bg-red-600 hover:bg-red-700">
+          {busy ? "Moving & deleting…" : "Move & Delete"}
+        </Button>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+      </>}
+    >
+      <p className="text-sm text-slate-600 mb-3">
+        <strong>{itemLabel}</strong> has <strong>{count}</strong> employee{count === 1 ? "" : "s"} assigned. Choose where to move them before deleting.
+      </p>
+      {err && <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{err}</div>}
+      <ModalField label="Move employees to">
+        <Select value={target} onChange={e => setTarget(e.target.value)}>
+          <option value="">— Unassign (no replacement) —</option>
+          {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </Select>
+      </ModalField>
+    </Modal>
+  );
+}
+
 function DepartmentsService() {
-  const employees = useEmployeeOptions();
+  const headOptions = useManageAccountsEmployeeOptions();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -139,6 +197,7 @@ function DepartmentsService() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -181,10 +240,17 @@ function DepartmentsService() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this department?")) return;
     setError("");
-    try { await api.deleteDepartment(id); await load(); }
-    catch (e: any) { setError(e.message); }
+    try {
+      const { employee_count } = await api.departmentEmployeeCount(id);
+      if (employee_count > 0) {
+        const dept = items.find(d => d.id === id);
+        setPendingDelete({ id, name: dept?.name || "This department", count: employee_count });
+        return;
+      }
+      if (!confirm("Delete this department?")) return;
+      await api.deleteDepartment(id); await load();
+    } catch (e: any) { setError(e.message); }
   }
 
   return (
@@ -245,8 +311,9 @@ function DepartmentsService() {
             <ModalField label="Department Head">
               <Select value={form.lead_id} onChange={e => setForm(f => ({ ...f, lead_id: e.target.value }))}>
                 <option value="">Select</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+                {headOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
               </Select>
+              <p className="text-[11px] text-slate-400 mt-1">Only employees with a Manage Accounts login can be set as head.</p>
             </ModalField>
             <ModalField label="Parent Department">
               <Select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}>
@@ -256,6 +323,22 @@ function DepartmentsService() {
             </ModalField>
           </div>
         </Modal>
+      )}
+
+      {pendingDelete && (
+        <ReassignDeleteModal
+          title={`Delete ${pendingDelete.name}`}
+          itemLabel={pendingDelete.name}
+          count={pendingDelete.count}
+          options={items.filter(d => d.id !== pendingDelete.id).map(d => ({ id: d.id, label: d.name }))}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async (targetId) => {
+            await api.reassignDepartmentEmployees(pendingDelete.id, targetId);
+            await api.deleteDepartment(pendingDelete.id);
+            setPendingDelete(null);
+            await load();
+          }}
+        />
       )}
     </Card>
   );
@@ -269,6 +352,7 @@ function DesignationsService() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", code: "", mail_alias: "" });
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -306,10 +390,17 @@ function DesignationsService() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this designation?")) return;
     setError("");
-    try { await api.deleteDesignation(id); await load(); }
-    catch (e: any) { setError(e.message); }
+    try {
+      const { employee_count } = await api.designationEmployeeCount(id);
+      if (employee_count > 0) {
+        const desig = items.find(d => d.id === id);
+        setPendingDelete({ id, name: desig?.title || "This designation", count: employee_count });
+        return;
+      }
+      if (!confirm("Delete this designation?")) return;
+      await api.deleteDesignation(id); await load();
+    } catch (e: any) { setError(e.message); }
   }
 
   return (
@@ -363,6 +454,22 @@ function DesignationsService() {
             </ModalField>
           </div>
         </Modal>
+      )}
+
+      {pendingDelete && (
+        <ReassignDeleteModal
+          title={`Delete ${pendingDelete.name}`}
+          itemLabel={pendingDelete.name}
+          count={pendingDelete.count}
+          options={items.filter(d => d.id !== pendingDelete.id).map(d => ({ id: d.id, label: d.title }))}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async (targetId) => {
+            await api.reassignDesignationEmployees(pendingDelete.id, targetId);
+            await api.deleteDesignation(pendingDelete.id);
+            setPendingDelete(null);
+            await load();
+          }}
+        />
       )}
     </Card>
   );
@@ -578,13 +685,16 @@ function OrganizationDetailsService() {
                 {company?.logo_url
                   ? <img src={`${API_BASE}${company.logo_url}`} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200"/>
                   : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
-                <label className="text-sm text-brand-600 hover:underline cursor-pointer">
-                  {uploadingLogo ? "Uploading…" : "Change"}
-                  <input
-                    type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
-                  />
-                </label>
+                <div>
+                  <label className="text-sm text-brand-600 hover:underline cursor-pointer">
+                    {uploadingLogo ? "Uploading…" : "Change"}
+                    <input
+                      type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
+                    />
+                  </label>
+                  <p className="text-[11px] text-slate-400">Exactly 80×55px, max 500KB</p>
+                </div>
               </div>
             </ModalField>
             <ModalField label="Name *">
@@ -665,6 +775,8 @@ function EmployeeInformationService() {
 }
 
 function UsersService() {
+  const router = useRouter();
+  const employees = useEmployeeOptions();
   const [me, setMe] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -673,6 +785,9 @@ function UsersService() {
   const [form, setForm] = useState({ email: "", role: "employee" });
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ email: "", employee_id: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
 
@@ -707,6 +822,22 @@ function UsersService() {
     setError("");
     try { await api.toggleUserActive(id); await load(); }
     catch (e: any) { setError(e.message); }
+  }
+
+  function startEdit(u: any) {
+    setEditForm({ email: u.email, employee_id: u.employee_id || "" });
+    setEditingUser(u);
+  }
+
+  async function saveEdit() {
+    if (!editingUser || !editForm.email.trim()) return;
+    setSavingEdit(true); setError("");
+    try {
+      await api.updateUserProfile(editingUser.id, { email: editForm.email.trim(), employee_id: editForm.employee_id || null });
+      setEditingUser(null);
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSavingEdit(false); }
   }
 
   if (me && !ADMIN_ROLES.includes(me.role)) {
@@ -745,12 +876,13 @@ function UsersService() {
               <th className="px-4 py-3 font-medium">Role</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Login</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
+            {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">No user accounts yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No user accounts yet.</td></tr>
             )}
             {items.map(u => (
               <tr key={u.id} className="border-t border-slate-100">
@@ -785,6 +917,20 @@ function UsersService() {
                     )} />
                   </button>
                 </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => u.employee_id ? router.push(`/employees/${u.employee_id}`) : setError("No employee profile linked to this account yet — use Edit to link one.")}
+                      className="text-slate-400 hover:text-slate-700"
+                      title="View linked employee profile"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => startEdit(u)} className="text-slate-400 hover:text-slate-700" title="Edit account">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -808,6 +954,27 @@ function UsersService() {
               <option value="company_admin">Company Admin</option>
               <option value="hr_manager">HR Manager</option>
               <option value="employee">Employee</option>
+            </Select>
+          </ModalField>
+        </Modal>
+      )}
+
+      {editingUser && (
+        <Modal
+          title="Edit Account"
+          onClose={() => setEditingUser(null)}
+          footer={<>
+            <Button onClick={saveEdit} disabled={savingEdit || !editForm.email.trim()}>{savingEdit ? "Saving…" : "Save"}</Button>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Email *">
+            <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoFocus/>
+          </ModalField>
+          <ModalField label="Linked Employee Profile">
+            <Select value={editForm.employee_id} onChange={e => setEditForm(f => ({ ...f, employee_id: e.target.value }))}>
+              <option value="">— Not linked —</option>
+              {employees.map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} ({e.emp_code})</option>)}
             </Select>
           </ModalField>
         </Modal>

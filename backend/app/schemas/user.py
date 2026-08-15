@@ -8,6 +8,10 @@ class UserCreateIn(BaseModel):
 class UserRoleUpdateIn(BaseModel):
     role: str
 
+class UserProfileUpdateIn(BaseModel):
+    email: EmailStr
+    employee_id: Optional[str] = None
+
 class UserOut(BaseModel):
     id: str
     email: str

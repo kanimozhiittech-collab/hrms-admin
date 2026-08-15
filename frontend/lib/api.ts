@@ -89,17 +89,25 @@ export const api = {
   listUsers: () => request<any[]>("/api/users"),
   createUser: (data: any) => request<any>("/api/users", { method: "POST", body: JSON.stringify(data) }),
   updateUserRole: (id: string, role: string) => request<any>(`/api/users/${id}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+  updateUserProfile: (id: string, data: { email: string; employee_id: string | null }) =>
+    request<any>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   toggleUserActive: (id: string) => request<any>(`/api/users/${id}/toggle`, { method: "PUT" }),
 
   departments: () => request<any[]>("/api/meta/departments"),
   createDepartment: (data: any) => request<any>("/api/meta/departments", { method: "POST", body: JSON.stringify(data) }),
   updateDepartment: (id: string, data: any) => request<any>(`/api/meta/departments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteDepartment: (id: string) => request<void>(`/api/meta/departments/${id}`, { method: "DELETE" }),
+  departmentEmployeeCount: (id: string) => request<{ employee_count: number }>(`/api/meta/departments/${id}/employee-count`),
+  reassignDepartmentEmployees: (id: string, toDepartmentId: string | null) =>
+    request<void>(`/api/meta/departments/${id}/reassign`, { method: "PUT", body: JSON.stringify({ to_department_id: toDepartmentId }) }),
 
   designations: () => request<any[]>("/api/meta/designations"),
   createDesignation: (data: any) => request<any>("/api/meta/designations", { method: "POST", body: JSON.stringify(data) }),
   updateDesignation: (id: string, data: any) => request<any>(`/api/meta/designations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteDesignation: (id: string) => request<void>(`/api/meta/designations/${id}`, { method: "DELETE" }),
+  designationEmployeeCount: (id: string) => request<{ employee_count: number }>(`/api/meta/designations/${id}/employee-count`),
+  reassignDesignationEmployees: (id: string, toDesignationId: string | null) =>
+    request<void>(`/api/meta/designations/${id}/reassign`, { method: "PUT", body: JSON.stringify({ to_designation_id: toDesignationId }) }),
 
   locations: () => request<any[]>("/api/meta/locations"),
   createLocation: (data: any) => request<any>("/api/meta/locations", { method: "POST", body: JSON.stringify(data) }),

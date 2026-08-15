@@ -7,6 +7,7 @@ from ..models import Department, Designation, WorkLocation, Shift, User, Holiday
 from ..schemas import (
     DepartmentIn, DepartmentOut, DesignationIn, DesignationOut,
     LocationIn, LocationOut, ShiftIn, ShiftOut,
+    ReassignDepartmentIn, ReassignDesignationIn,
 )
 from ..schemas.attendance import HolidayIn, HolidayOut
 from .deps import current_user
@@ -74,6 +75,38 @@ def update_department(dept_id: str, payload: DepartmentIn, db: Session = Depends
     return _dept_out(dept, lead_map, parent_map)
 
 
+@router.get("/departments/{dept_id}/employee-count")
+def department_employee_count(dept_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    _require_hr(user)
+    count = db.query(Employee).filter(
+        Employee.department_id == dept_id, Employee.company_id == user.company_id
+    ).count()
+    return {"employee_count": count}
+
+
+@router.put("/departments/{dept_id}/reassign", status_code=204)
+def reassign_department_employees(
+    dept_id: str, payload: ReassignDepartmentIn,
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    """Move every employee out of this department (to another department, or unassigned)
+    before it gets deleted."""
+    _require_hr(user)
+    if payload.to_department_id == dept_id:
+        raise HTTPException(status_code=400, detail="Cannot move employees to the same department being deleted")
+    if payload.to_department_id:
+        target = db.query(Department).filter(
+            Department.id == payload.to_department_id, Department.company_id == user.company_id
+        ).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Target department not found")
+    db.query(Employee).filter(
+        Employee.department_id == dept_id, Employee.company_id == user.company_id
+    ).update({"department_id": payload.to_department_id})
+    db.commit()
+    return None
+
+
 @router.delete("/departments/{dept_id}", status_code=204)
 def delete_department(dept_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
     _require_hr(user)
@@ -117,6 +150,36 @@ def update_designation(designation_id: str, payload: DesignationIn, db: Session 
     db.commit()
     db.refresh(designation)
     return designation
+
+
+@router.get("/designations/{designation_id}/employee-count")
+def designation_employee_count(designation_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    _require_hr(user)
+    count = db.query(Employee).filter(
+        Employee.designation_id == designation_id, Employee.company_id == user.company_id
+    ).count()
+    return {"employee_count": count}
+
+
+@router.put("/designations/{designation_id}/reassign", status_code=204)
+def reassign_designation_employees(
+    designation_id: str, payload: ReassignDesignationIn,
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    _require_hr(user)
+    if payload.to_designation_id == designation_id:
+        raise HTTPException(status_code=400, detail="Cannot move employees to the same designation being deleted")
+    if payload.to_designation_id:
+        target = db.query(Designation).filter(
+            Designation.id == payload.to_designation_id, Designation.company_id == user.company_id
+        ).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Target designation not found")
+    db.query(Employee).filter(
+        Employee.designation_id == designation_id, Employee.company_id == user.company_id
+    ).update({"designation_id": payload.to_designation_id})
+    db.commit()
+    return None
 
 
 @router.delete("/designations/{designation_id}", status_code=204)

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, Upload } from "lucide-react";
+import { ArrowLeft, FileText, Upload, Pencil } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -198,6 +198,13 @@ export default function EmployeeDetailPage() {
             </h2>
             {employee && <p className="text-sm text-slate-500">{employee.emp_code} · {employee.work_email}</p>}
           </div>
+          {employee && (
+            <Link href={`/employees/${employeeId}/edit`}>
+              <Button type="button" variant="outline">
+                <Pencil className="h-4 w-4" />Edit
+              </Button>
+            </Link>
+          )}
         </div>
 
         {employee && (

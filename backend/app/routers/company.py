@@ -1,3 +1,4 @@
+import io
 import shutil
 import uuid
 import tempfile
@@ -5,6 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -14,6 +16,10 @@ from .deps import current_user
 
 router = APIRouter(prefix="/api/company", tags=["company"])
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "hrms_uploads"
+
+LOGO_MAX_BYTES = 500 * 1024
+LOGO_WIDTH = 80
+LOGO_HEIGHT = 55
 
 
 def _require_admin(user: User):
@@ -48,12 +54,27 @@ def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), use
     company = db.query(Company).filter(Company.id == user.company_id).first()
     if not company:
         raise HTTPException(404, "Company not found")
+
+    raw = file.file.read()
+    if len(raw) > LOGO_MAX_BYTES:
+        raise HTTPException(400, f"Logo must be {LOGO_MAX_BYTES // 1024}KB or smaller")
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img.verify()
+        img = Image.open(io.BytesIO(raw))  # re-open: verify() leaves the image unusable
+    except Exception:
+        raise HTTPException(400, "Invalid image file")
+    if img.width != LOGO_WIDTH or img.height != LOGO_HEIGHT:
+        raise HTTPException(
+            400, f"Logo must be exactly {LOGO_WIDTH}x{LOGO_HEIGHT}px (uploaded image is {img.width}x{img.height}px)"
+        )
+
     ext = Path(file.filename or "").suffix
     fname = f"{uuid.uuid4().hex}{ext}"
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     fpath = UPLOAD_DIR / fname
     with fpath.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(raw)
     company.logo_url = f"/api/company/logo/{fname}"
     db.commit()
     db.refresh(company)
