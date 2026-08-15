@@ -148,6 +148,12 @@ class DepartmentOut(BaseModel):
     parent_name: Optional[str] = None
     class Config: from_attributes = True
 
+class ReassignDepartmentIn(BaseModel):
+    to_department_id: Optional[str] = None
+
+class ReassignDesignationIn(BaseModel):
+    to_designation_id: Optional[str] = None
+
 class DesignationIn(BaseModel):
     title: str
     code: Optional[str] = None

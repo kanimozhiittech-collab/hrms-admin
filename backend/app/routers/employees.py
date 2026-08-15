@@ -26,6 +26,9 @@ DEFAULT_EMPLOYEE_PASSWORD = "Welcome@123"
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
 
+# Employee statuses that should block that person's login until they're re-activated.
+BLOCKING_STATUSES = {"Inactive", "Resigned", "Terminated"}
+
 
 def _require_hr(user: User):
     if user.role not in HR_ROLES:
@@ -127,6 +130,7 @@ def create_employee(body: EmployeeIn, db: Session = Depends(get_db), user: User 
                 password_hash=hash_password(DEFAULT_EMPLOYEE_PASSWORD),
                 role="employee",
                 employee_id=e.id,
+                is_active=e.status not in BLOCKING_STATUSES,
             ))
             db.commit()
 
@@ -146,6 +150,14 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
     for x in body.experience: e.experience.append(ExperienceRecord(**x.model_dump()))
     for x in body.dependents: e.dependents.append(Dependent(**x.model_dump()))
     for x in body.emergency_contacts: e.emergency_contacts.append(EmergencyContact(**x.model_dump()))
+
+    # Keep the employee's login access in sync with their status — resigning/deactivating
+    # an employee here should immediately block them from signing in, and vice versa.
+    # An employee can have more than one login linked (their own auto-created
+    # account, plus any manually linked from Manage Accounts) — sync all of them.
+    for login in db.query(User).filter(User.employee_id == emp_id).all():
+        login.is_active = e.status not in BLOCKING_STATUSES
+
     db.commit(); db.refresh(e)
     return _serialize(e)
 
@@ -157,10 +169,12 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
     if not e: raise HTTPException(404, "Not found")
 
     # Detach dependents before deleting, so we don't crash on FK constraints
-    # for things that shouldn't block a deletion outright.
-    login = db.query(User).filter(User.employee_id == emp_id).first()
+    # for things that shouldn't block a deletion outright. An employee can have
+    # more than one login linked (their own auto-created account, plus any
+    # manually linked from Manage Accounts) — clean up every one of them.
+    logins = db.query(User).filter(User.employee_id == emp_id).all()
     db.query(Employee).filter(Employee.reporting_manager_id == emp_id).update({"reporting_manager_id": None})
-    if login:
+    for login in logins:
         # This employee's login may have reviewed other people's leave/regularization
         # requests as a manager — detach those before the login row itself is deleted.
         db.query(LeaveRequest).filter(LeaveRequest.reviewed_by == login.id).update({"reviewed_by": None})
@@ -170,7 +184,7 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
     db.query(RegularizationRequest).filter(RegularizationRequest.employee_id == emp_id).delete()
     db.query(LeaveRequest).filter(LeaveRequest.employee_id == emp_id).delete()
     db.query(LeaveBalance).filter(LeaveBalance.employee_id == emp_id).delete()
-    if login:
+    for login in logins:
         db.delete(login)
         db.flush()  # SQLAlchemy won't auto-order this delete before the Employee's without a flush
 

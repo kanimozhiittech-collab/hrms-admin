@@ -3,7 +3,8 @@ from .employee import (
     EmployeeIn, EmployeeOut, EmployeeListItem, EmployeeListResponse,
     AddressIn, EducationIn, ExperienceIn, DependentIn, EmergencyIn, DocumentOut,
     DepartmentIn, DepartmentOut, DesignationIn, DesignationOut,
-    LocationIn, LocationOut, ShiftIn, ShiftOut
+    LocationIn, LocationOut, ShiftIn, ShiftOut,
+    ReassignDepartmentIn, ReassignDesignationIn,
 )
 from .dashboard import DashboardStats
 from .attendance import (
@@ -15,7 +16,7 @@ from .leave import (
     LeaveReview, LeaveCalendarItem,
 )
 from .provisioning import ProvisionCompanyIn
-from .user import UserCreateIn, UserRoleUpdateIn, UserOut, UserCreateOut
+from .user import UserCreateIn, UserRoleUpdateIn, UserProfileUpdateIn, UserOut, UserCreateOut
 from .services import (
     OrgFileOut,
     LetterRequestIn, LetterStatusIn, LetterRequestOut,
