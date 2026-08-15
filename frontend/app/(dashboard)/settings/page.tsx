@@ -825,6 +825,13 @@ function UsersService() {
   }
 
   function startEdit(u: any) {
+    if (u.employee_id) {
+      // Already linked to an employee — edit the full employee record directly,
+      // same form used everywhere else in the app.
+      router.push(`/employees/${u.employee_id}/edit`);
+      return;
+    }
+    // Not linked yet — link (or change the login email) first via the small modal.
     setEditForm({ email: u.email, employee_id: u.employee_id || "" });
     setEditingUser(u);
   }
@@ -834,8 +841,14 @@ function UsersService() {
     setSavingEdit(true); setError("");
     try {
       await api.updateUserProfile(editingUser.id, { email: editForm.email.trim(), employee_id: editForm.employee_id || null });
+      const linkedNow = editForm.employee_id;
       setEditingUser(null);
-      await load();
+      if (linkedNow) {
+        // Now that a profile is linked, go straight into editing it.
+        router.push(`/employees/${linkedNow}/edit`);
+      } else {
+        await load();
+      }
     } catch (e: any) { setError(e.message); }
     finally { setSavingEdit(false); }
   }
@@ -961,13 +974,16 @@ function UsersService() {
 
       {editingUser && (
         <Modal
-          title="Edit Account"
+          title="Link Employee Profile"
           onClose={() => setEditingUser(null)}
           footer={<>
             <Button onClick={saveEdit} disabled={savingEdit || !editForm.email.trim()}>{savingEdit ? "Saving…" : "Save"}</Button>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
           </>}
         >
+          <p className="text-xs text-slate-500 mb-3">
+            This account isn't linked to an employee profile yet. Link one to edit their full details — you'll be taken straight to the edit form.
+          </p>
           <ModalField label="Email *">
             <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} autoFocus/>
           </ModalField>
