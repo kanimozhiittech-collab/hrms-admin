@@ -22,5 +22,6 @@ from .services import (
     LetterRequestIn, LetterStatusIn, LetterRequestOut,
     TaskIn, TaskStatusIn, TaskOut,
     ExitDetailIn, ExitStatusIn, ExitDetailOut,
+    MeetingIn, MeetingOut,
 )
 from .company import CompanyUpdateIn, CompanyOut

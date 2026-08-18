@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 
 
 # ── Files ──
@@ -60,6 +60,29 @@ class TaskOut(BaseModel):
     status: str
     created_at: datetime
     class Config: from_attributes = True
+
+
+# ── Meetings ──
+class MeetingIn(BaseModel):
+    title: str
+    description: Optional[str] = None
+    meeting_date: date
+    start_time: str
+    end_time: str
+    participant_ids: List[str] = []
+
+class MeetingOut(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    meeting_date: date
+    start_time: str
+    end_time: str
+    organizer_id: str
+    organizer_name: Optional[str] = None
+    participant_ids: List[str] = []
+    participant_names: List[str] = []
+    created_at: datetime
 
 
 # ── General / Exit Details ──

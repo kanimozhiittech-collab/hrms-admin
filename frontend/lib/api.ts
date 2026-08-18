@@ -37,6 +37,7 @@ export const api = {
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") q.set(k, String(v)); });
     return request<any>(`/api/employees?${q.toString()}`);
   },
+  employeeDirectory: () => request<{ id: string; name: string; emp_code: string }[]>("/api/employees/directory/list"),
   createEmployee: (data: any) => request<any>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
   getEmployee: (id: string) => request<any>(`/api/employees/${id}`),
   updateEmployee: (id: string, data: any) => request<any>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -78,6 +79,11 @@ export const api = {
   updateExitStatus: (id: string, status: string) =>
     request<any>(`/api/exit-details/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
 
+  // ── Meetings ──
+  listMeetings: (month: number, year: number) => request<any[]>(`/api/meetings?month=${month}&year=${year}`),
+  createMeeting: (data: any) => request<any>("/api/meetings", { method: "POST", body: JSON.stringify(data) }),
+  deleteMeeting: (id: string) => request<void>(`/api/meetings/${id}`, { method: "DELETE" }),
+
   getCompany: () => request<any>("/api/company"),
   updateCompany: (data: any) => request<any>("/api/company", { method: "PUT", body: JSON.stringify(data) }),
   uploadCompanyLogo: (file: File) => {
@@ -89,7 +95,7 @@ export const api = {
   listUsers: () => request<any[]>("/api/users"),
   createUser: (data: any) => request<any>("/api/users", { method: "POST", body: JSON.stringify(data) }),
   updateUserRole: (id: string, role: string) => request<any>(`/api/users/${id}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
-  updateUserProfile: (id: string, data: { email: string; employee_id: string | null }) =>
+  updateUserProfile: (id: string, data: { email: string; employee_id: string | null; assigned_department_id?: string | null }) =>
     request<any>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   toggleUserActive: (id: string) => request<any>(`/api/users/${id}/toggle`, { method: "PUT" }),
 

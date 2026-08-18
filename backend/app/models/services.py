@@ -45,6 +45,24 @@ class HrTask(Base):
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
 
 
+class Meeting(Base):
+    __tablename__ = "meetings"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    meeting_date: Mapped[date] = mapped_column(Date, index=True)
+    start_time: Mapped[str] = mapped_column(String(5))  # "HH:MM"
+    end_time: Mapped[str] = mapped_column(String(5))
+    # References the login account, not the employee record — admins/company
+    # admins often have no linked employee profile but must still be able to
+    # organize a meeting.
+    organizer_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    # Comma-separated employee ids, same lightweight pattern as Employee.tags.
+    participant_ids: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+
+
 class ExitDetail(Base):
     __tablename__ = "exit_details"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
