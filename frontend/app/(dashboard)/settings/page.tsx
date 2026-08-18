@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1364,6 +1365,13 @@ function UsersService() {
               {employees.map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} ({e.emp_code})</option>)}
             </Select>
           </ModalField>
+          <div className="text-center text-xs text-slate-400 my-1">— or —</div>
+          <Link
+            href={`/employees/new?link_user_id=${editingUser.id}&email=${encodeURIComponent(editingUser.email)}`}
+            className="block text-center text-sm text-brand-600 hover:underline"
+          >
+            Create a new Employee profile for this account
+          </Link>
         </Modal>
       )}
     </Card>

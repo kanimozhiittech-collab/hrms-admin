@@ -184,11 +184,15 @@ function SelectField({ name, label, children }: any) {
 
 /* ---------- Shared form used by both Add Employee and Edit Employee ---------- */
 export function EmployeeForm({
-  mode, employeeId, initialValues,
+  mode, employeeId, initialValues, linkUserId, defaultEmail,
 }: {
   mode: "create" | "edit";
   employeeId?: string;
   initialValues?: EmployeeFormValues;
+  /** When creating from Manage Accounts' "Create New Employee Profile" flow — the
+   * login account to link to the newly created employee once it's saved. */
+  linkUserId?: string;
+  defaultEmail?: string;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState("personal");
@@ -203,7 +207,7 @@ export function EmployeeForm({
 
   const methods = useForm<EmployeeFormValues>({
     resolver: zodResolver(schema) as any,
-    defaultValues: (initialValues || EMPLOYEE_FORM_DEFAULTS) as any,
+    defaultValues: (initialValues || (defaultEmail ? { ...EMPLOYEE_FORM_DEFAULTS, work_email: defaultEmail } : EMPLOYEE_FORM_DEFAULTS)) as any,
   });
 
   const eduFA = useFieldArray({ control: methods.control, name: "education" });
@@ -229,8 +233,13 @@ export function EmployeeForm({
           await api.uploadEmployeeDocument(res.id, docType, docFile);
           toast.success(`${docFile.name} uploaded`);
         }
-        toast.success(`${res.first_name} ${res.last_name} created`);
-        if (saveAndNew) {
+        if (linkUserId) {
+          await api.updateUserProfile(linkUserId, { email: res.work_email, employee_id: res.id });
+          toast.success(`${res.first_name} ${res.last_name} created and linked to the login account`);
+        } else {
+          toast.success(`${res.first_name} ${res.last_name} created`);
+        }
+        if (saveAndNew && !linkUserId) {
           methods.reset();
           setDocFile(null);
         } else {
@@ -253,12 +262,16 @@ export function EmployeeForm({
         <form onSubmit={methods.handleSubmit(v => onSubmit(v, false))} className="p-4 lg:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">{mode === "edit" ? "Edit Employee" : "Add Employee"}</h2>
-              <p className="text-sm text-slate-500">Fill the form across tabs. Required fields are marked.</p>
+              <h2 className="text-xl font-semibold text-slate-900">{mode === "edit" ? "Edit Employee" : linkUserId ? "Create Employee Profile" : "Add Employee"}</h2>
+              <p className="text-sm text-slate-500">
+                {linkUserId
+                  ? "This profile will be linked to the existing login account once saved."
+                  : "Fill the form across tabs. Required fields are marked."}
+              </p>
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={() => router.back()}><X className="h-4 w-4"/>Cancel</Button>
-              {mode === "create" && (
+              {mode === "create" && !linkUserId && (
                 <Button type="button" variant="outline" onClick={methods.handleSubmit(v => onSubmit(v, true))}><Save className="h-4 w-4"/>Save & New</Button>
               )}
               <Button type="submit"><Save className="h-4 w-4"/>Save</Button>
