@@ -75,5 +75,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(30), default="company_admin")  # super_admin / company_admin / hr_manager / employee
     employee_id: Mapped[str | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
+    # When set on an hr_manager account, that HR manager's access is scoped to
+    # employees in this department only. Ignored for other roles (always full access).
+    assigned_department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())

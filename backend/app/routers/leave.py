@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from ..database import get_db
 from ..models import (
-    AttendanceLog, Employee, Holiday, LeaveBalance, LeaveRequest, LeaveType, User,
+    AttendanceLog, Department, Employee, Holiday, LeaveBalance, LeaveRequest, LeaveType, User,
 )
 from ..models.attendance import ATT_ON_LEAVE, ATT_HALF_DAY
 from ..models.leave import LR_PENDING, LR_APPROVED, LR_REJECTED, LR_CANCELLED
@@ -30,15 +30,30 @@ def _own_employee_id(db: Session, user: User) -> Optional[str]:
     return emp.id if emp else None
 
 
+def _led_department_ids(db: Session, company_id: str, my_emp_id: str) -> List[str]:
+    """Departments this employee is the Head of, if any."""
+    return [
+        d.id for d in db.query(Department.id)
+        .filter(Department.company_id == company_id, Department.lead_id == my_emp_id)
+        .all()
+    ]
+
+
 def _can_review(db: Session, user: User, req: LeaveRequest) -> bool:
-    """HR can review anyone's request; a reporting manager can review their own reports'."""
+    """HR can review anyone's request; a reporting manager can review their own
+    reports'; a Department Head can also review anyone in their department."""
     if _is_hr(user):
         return True
     my_emp_id = _own_employee_id(db, user)
     if not my_emp_id:
         return False
     target = db.query(Employee).filter(Employee.id == req.employee_id).first()
-    return bool(target and target.reporting_manager_id == my_emp_id)
+    if not target:
+        return False
+    if target.reporting_manager_id == my_emp_id:
+        return True
+    led_dept_ids = _led_department_ids(db, user.company_id, my_emp_id)
+    return bool(target.department_id and target.department_id in led_dept_ids)
 
 
 def _resolve_employee(db: Session, user: User) -> Employee | None:
@@ -400,14 +415,23 @@ def team_requests(
     q = db.query(LeaveRequest).filter(LeaveRequest.company_id == user.company_id)
     if not _is_hr(user):
         my_emp_id = _own_employee_id(db, user)
-        report_ids = [
-            e.id for e in db.query(Employee.id)
-            .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
-            .all()
-        ] if my_emp_id else []
-        if not report_ids:
+        reviewable_ids = set()
+        if my_emp_id:
+            reviewable_ids.update(
+                e.id for e in db.query(Employee.id)
+                .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
+                .all()
+            )
+            led_dept_ids = _led_department_ids(db, user.company_id, my_emp_id)
+            if led_dept_ids:
+                reviewable_ids.update(
+                    e.id for e in db.query(Employee.id)
+                    .filter(Employee.company_id == user.company_id, Employee.department_id.in_(led_dept_ids))
+                    .all()
+                )
+        if not reviewable_ids:
             raise HTTPException(status_code=403, detail="Not authorized")
-        q = q.filter(LeaveRequest.employee_id.in_(report_ids))
+        q = q.filter(LeaveRequest.employee_id.in_(reviewable_ids))
     if status and status != "all":
         q = q.filter(LeaveRequest.status == status)
     reqs = q.order_by(LeaveRequest.created_at.desc()).all()

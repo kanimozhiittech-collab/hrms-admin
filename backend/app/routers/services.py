@@ -8,13 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from datetime import date
+import calendar as calendar_mod
+
 from ..database import get_db
-from ..models import Employee, OrgFile, LetterRequest, HrTask, ExitDetail, User
+from ..models import Employee, OrgFile, LetterRequest, HrTask, ExitDetail, Meeting, User
 from ..schemas import (
     OrgFileOut,
     LetterRequestIn, LetterStatusIn, LetterRequestOut,
     TaskIn, TaskStatusIn, TaskOut,
     ExitDetailIn, ExitStatusIn, ExitDetailOut,
+    MeetingIn, MeetingOut,
 )
 from .deps import current_user
 
@@ -286,3 +290,88 @@ def update_exit_status(
     db.refresh(r)
     names = _emp_name_map(db, user.company_id, [r.employee_id, r.interviewer_id])
     return _exit_out(r, names)
+
+
+# ──────────────────────────────────────────────
+# Meetings (Dashboard calendar — click a date to schedule a meeting)
+# ──────────────────────────────────────────────
+meetings_router = APIRouter(prefix="/api/meetings", tags=["meetings"])
+
+
+def _user_name_map(db: Session, company_id: str, user_ids: List[str]) -> dict:
+    """Display name for a login account — prefers their linked employee's name,
+    falls back to their email (covers admin accounts with no employee profile)."""
+    ids = [i for i in set(user_ids) if i]
+    if not ids:
+        return {}
+    rows = db.query(User).filter(User.id.in_(ids), User.company_id == company_id).all()
+    emp_ids = [u.employee_id for u in rows if u.employee_id]
+    emp_names = _emp_name_map(db, company_id, emp_ids)
+    return {u.id: (emp_names.get(u.employee_id) or u.email) for u in rows}
+
+
+def _meeting_out(m: Meeting, organizer_names: dict, participant_names: dict) -> MeetingOut:
+    participant_ids = [p for p in (m.participant_ids or "").split(",") if p]
+    return MeetingOut(
+        id=m.id, title=m.title, description=m.description, meeting_date=m.meeting_date,
+        start_time=m.start_time, end_time=m.end_time,
+        organizer_id=m.organizer_id, organizer_name=organizer_names.get(m.organizer_id),
+        participant_ids=participant_ids,
+        participant_names=[participant_names[p] for p in participant_ids if p in participant_names],
+        created_at=m.created_at,
+    )
+
+
+@meetings_router.get("", response_model=List[MeetingOut])
+def list_meetings(
+    month: int, year: int,
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    _, last_day = calendar_mod.monthrange(year, month)
+    rows = (
+        db.query(Meeting)
+        .filter(
+            Meeting.company_id == user.company_id,
+            Meeting.meeting_date >= date(year, month, 1),
+            Meeting.meeting_date <= date(year, month, last_day),
+        )
+        .order_by(Meeting.meeting_date, Meeting.start_time)
+        .all()
+    )
+    organizer_names = _user_name_map(db, user.company_id, [r.organizer_id for r in rows])
+    participant_ids = [p for r in rows for p in (r.participant_ids or "").split(",") if p]
+    participant_names = _emp_name_map(db, user.company_id, participant_ids)
+    return [_meeting_out(r, organizer_names, participant_names) for r in rows]
+
+
+@meetings_router.post("", response_model=MeetingOut)
+def create_meeting(body: MeetingIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    valid_participants = []
+    if body.participant_ids:
+        rows = db.query(Employee).filter(
+            Employee.id.in_(body.participant_ids), Employee.company_id == user.company_id
+        ).all()
+        valid_participants = [e.id for e in rows]
+    m = Meeting(
+        company_id=user.company_id, title=body.title, description=body.description,
+        meeting_date=body.meeting_date, start_time=body.start_time, end_time=body.end_time,
+        organizer_id=user.id, participant_ids=",".join(valid_participants) or None,
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    organizer_names = _user_name_map(db, user.company_id, [user.id])
+    participant_names = _emp_name_map(db, user.company_id, valid_participants)
+    return _meeting_out(m, organizer_names, participant_names)
+
+
+@meetings_router.delete("/{meeting_id}", status_code=204)
+def delete_meeting(meeting_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    m = db.query(Meeting).filter(Meeting.id == meeting_id, Meeting.company_id == user.company_id).first()
+    if not m:
+        return None
+    if not (user.role in HR_ROLES or m.organizer_id == user.id):
+        raise HTTPException(403, "Only the organizer or HR can cancel this meeting")
+    db.delete(m)
+    db.commit()
+    return None

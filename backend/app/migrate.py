@@ -9,6 +9,9 @@ from .database import engine
 
 # table -> {column: DDL type clause}
 NEW_COLUMNS = {
+    "users": {
+        "assigned_department_id": "VARCHAR(36)",
+    },
     "attendance_logs": {
         "status": "VARCHAR(20) DEFAULT 'Present'",
         "work_hours": "FLOAT",

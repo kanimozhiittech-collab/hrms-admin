@@ -35,6 +35,15 @@ def _require_hr(user: User):
         raise HTTPException(403, "Only HR/Admin can access the employee directory")
 
 
+def _dept_scope(user: User) -> Optional[str]:
+    """Department an hr_manager is restricted to, if their account has one assigned.
+    Returns None for super_admin/company_admin (always full access) and for
+    hr_managers with no department assigned (unrestricted, backward-compatible)."""
+    if user.role == "hr_manager" and user.assigned_department_id:
+        return user.assigned_department_id
+    return None
+
+
 def _serialize(e: Employee) -> dict:
     d = {c.name: getattr(e, c.name) for c in Employee.__table__.columns}
     d["addresses"] = [{c.name: getattr(a, c.name) for c in EmployeeAddress.__table__.columns if c.name not in ("id","employee_id")} for a in e.addresses]
@@ -58,6 +67,9 @@ def list_employees(
 ):
     _require_hr(user)
     qry = db.query(Employee).filter(Employee.company_id == user.company_id)
+    scope = _dept_scope(user)
+    if scope:
+        qry = qry.filter(Employee.department_id == scope)
     if q:
         like = f"%{q.lower()}%"
         qry = qry.filter(or_(
@@ -93,13 +105,33 @@ def get_file(fname: str):
     return FileResponse(fpath)
 
 
+@router.get("/directory/list")
+def employee_directory(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Lightweight, non-sensitive name list for pickers (e.g. meeting participants)
+    that any authenticated user can call — unlike the full directory, which is HR-only."""
+    rows = (
+        db.query(Employee)
+        .filter(Employee.company_id == user.company_id, Employee.status == "Active")
+        .order_by(Employee.first_name)
+        .all()
+    )
+    return [
+        {"id": e.id, "name": f"{e.first_name} {e.last_name}".strip(), "emp_code": e.emp_code}
+        for e in rows
+    ]
+
+
 @router.get("/{emp_id}", response_model=EmployeeOut)
 def get_employee(emp_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    # Employees may view only their own profile; HR can view anyone.
+    # Employees may view only their own profile; HR can view anyone (unless
+    # department-scoped, in which case only people in their own department).
     if user.role not in HR_ROLES and user.employee_id != emp_id:
         raise HTTPException(403, "You can only view your own profile")
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
+    scope = _dept_scope(user)
+    if scope and e.department_id != scope and user.employee_id != emp_id:
+        raise HTTPException(403, "This employee is outside your assigned department")
     return _serialize(e)
 
 
@@ -142,6 +174,11 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
     _require_hr(user)
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
+    scope = _dept_scope(user)
+    if scope and e.department_id != scope:
+        raise HTTPException(403, "This employee is outside your assigned department")
+    if scope and body.department_id != scope:
+        raise HTTPException(403, "You can only assign employees to your own department")
     data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts"})
     for k, v in data.items(): setattr(e, k, v)
     e.addresses.clear(); e.education.clear(); e.experience.clear(); e.dependents.clear(); e.emergency_contacts.clear()

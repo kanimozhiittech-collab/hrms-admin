@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tokenStore } from "@/lib/auth";
@@ -35,6 +35,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -137,11 +139,6 @@ const newHires = [
 const announcements = [
   { title: "Welcome to HRMS", date: "16 Jun 10:34 AM", by: "HR Team" },
   { title: "Quarterly all-hands on Friday", date: "15 Jun 09:12 AM", by: "CEO Office" },
-];
-
-const holidays = [
-  { name: "Independence Day", date: "Aug 15, 2026", day: "Saturday" },
-  { name: "Ganesh Chaturthi", date: "Aug 27, 2026", day: "Thursday" },
 ];
 
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -466,123 +463,241 @@ function GenericPanel({ title, data }: { title: string; data?: OverviewData }) {
   );
 }
 
-const calendarDays = [
-  { day: 31, muted: true },
-  { day: 1 },
-  { day: 2 },
-  { day: 3 },
-  { day: 4 },
-  { day: 5 },
-  { day: 6 },
-  { day: 7 },
-  { day: 8 },
-  { day: 9 },
-  { day: 10 },
-  { day: 11 },
-  { day: 12 },
-  { day: 13 },
-  { day: 14, weekend: true, events: [{ label: "Weekend", tone: "text-orange-500" }] },
-  { day: 15, events: [{ label: "Absent", tone: "text-red-500" }] },
-  { day: 16, today: true, events: [{ label: "General", tone: "text-blue-600" }] },
-  { day: 17, events: [{ label: "General", tone: "text-blue-600" }] },
-  { day: 18, events: [{ label: "General", tone: "text-blue-600" }] },
-  { day: 19, events: [{ label: "General", tone: "text-blue-600" }] },
-  { day: 20, weekend: true, events: [{ label: "Weekend", tone: "text-orange-500" }] },
-  { day: 21, weekend: true },
-  { day: 22 },
-  { day: 23 },
-  { day: 24 },
-  { day: 25 },
-  { day: 26 },
-  { day: 27 },
-  { day: 28, weekend: true },
-  { day: 29 },
-  { day: 30 },
-  { day: 1, muted: true },
-  { day: 2, muted: true },
-  { day: 3, muted: true },
-  { day: 4, muted: true },
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
+function buildMonthGrid(year: number, month: number) {
+  const first = new Date(year, month - 1, 1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+  const cells = [];
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(year, month - 1, 1 - startWeekday + i);
+    cells.push({
+      key: d.toISOString().slice(0, 10),
+      day: d.getDate(),
+      muted: d.getMonth() !== month - 1,
+      weekend: d.getDay() === 0 || d.getDay() === 6,
+    });
+  }
+  return cells;
+}
+
+function CreateMeetingModal({ date, onClose, onDone }: { date: string; onClose: () => void; onDone: () => void }) {
+  const [form, setForm] = useState({ title: "", description: "", start_time: "10:00", end_time: "11:00", participant_ids: [] as string[] });
+  const [directory, setDirectory] = useState<{ id: string; name: string }[]>([]);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { api.employeeDirectory().then(setDirectory).catch(() => {}); }, []);
+
+  function toggleParticipant(id: string) {
+    setForm(f => ({
+      ...f,
+      participant_ids: f.participant_ids.includes(id) ? f.participant_ids.filter(x => x !== id) : [...f.participant_ids, id],
+    }));
+  }
+
+  async function submit() {
+    if (!form.title.trim()) return;
+    setErr(""); setBusy(true);
+    try {
+      await api.createMeeting({ ...form, meeting_date: date });
+      onDone();
+    } catch (e: any) { setErr(e.message || "Failed to schedule meeting."); }
+    finally { setBusy(false); }
+  }
+
+  const dateLabel = new Date(date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <Modal
+      title={`Schedule Meeting — ${dateLabel}`}
+      onClose={onClose}
+      footer={<>
+        <Button onClick={submit} disabled={busy || !form.title.trim()}>{busy ? "Scheduling…" : "Schedule"}</Button>
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+      </>}
+    >
+      <ModalField label="Meeting Title *">
+        <Input placeholder="e.g. Sprint Planning" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
+      </ModalField>
+      <div className="grid grid-cols-2 gap-4">
+        <ModalField label="Start Time">
+          <Input type="time" value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} />
+        </ModalField>
+        <ModalField label="End Time">
+          <Input type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} />
+        </ModalField>
+      </div>
+      <ModalField label="Description">
+        <textarea
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          rows={2}
+          value={form.description}
+          onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+        />
+      </ModalField>
+      <ModalField label="Participants">
+        <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 p-2 space-y-1">
+          {directory.length === 0 && <p className="text-xs text-slate-400 px-1 py-2">No colleagues found.</p>}
+          {directory.map(d => (
+            <label key={d.id} className="flex items-center gap-2 text-sm px-1 py-1 rounded hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" checked={form.participant_ids.includes(d.id)} onChange={() => toggleParticipant(d.id)} />
+              {d.name}
+            </label>
+          ))}
+        </div>
+      </ModalField>
+      {err && <div className="text-sm rounded-md px-3 py-2 bg-red-50 text-red-700">{err}</div>}
+    </Modal>
+  );
+}
+
 function CalendarPanel() {
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0, 10);
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [holidayList, setHolidayList] = useState<any[]>([]);
+  const [createDate, setCreateDate] = useState<string | null>(null);
+
+  async function loadMeetings() { setMeetings(await api.listMeetings(viewMonth, viewYear)); }
+  async function loadHolidays() { setHolidayList(await api.holidays(viewYear)); }
+  useEffect(() => { loadMeetings(); }, [viewMonth, viewYear]);
+  useEffect(() => { loadHolidays(); }, [viewYear]);
+
+  const cells = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
+  const meetingsByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    meetings.forEach((m: any) => { (map[m.meeting_date] ||= []).push(m); });
+    return map;
+  }, [meetings]);
+  const holidaysByDate = useMemo(() => {
+    const map: Record<string, any> = {};
+    holidayList.forEach((h: any) => { map[h.holiday_date] = h; });
+    return map;
+  }, [holidayList]);
+  const upcomingHolidays = useMemo(
+    () => holidayList.filter((h: any) => h.holiday_date >= todayKey).slice(0, 5),
+    [holidayList, todayKey]
+  );
+
+  function goToday() { setViewYear(today.getFullYear()); setViewMonth(today.getMonth() + 1); }
+  function prevMonth() {
+    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); } else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1); } else setViewMonth(m => m + 1);
+  }
+
   return (
     <div className="space-y-3">
       <ContentCard className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Calendar</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-900">June 2026</h2>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">{MONTH_NAMES[viewMonth - 1]} {viewYear}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8">Today</Button>
-          <Button variant="outline" size="sm" className="h-8">Month</Button>
-          <Button variant="outline" size="sm" className="h-8">Week</Button>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={prevMonth}>‹</Button>
+          <Button variant="outline" size="sm" className="h-8" onClick={goToday}>Today</Button>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={nextMonth}>›</Button>
         </div>
       </ContentCard>
 
       <div className="grid gap-3 xl:grid-cols-[1fr_280px]">
         <ContentCard className="overflow-hidden">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-semibold text-slate-500">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            {WEEKDAYS.map((day) => (
               <div key={day} className="border-r border-slate-200 px-2 py-2 last:border-r-0">
                 {day}
               </div>
             ))}
           </div>
           <div className="grid grid-cols-7">
-            {calendarDays.map((date, index) => (
-              <div
-                key={`${date.day}-${index}`}
-                className={cn(
-                  "min-h-24 border-b border-r border-slate-100 bg-white p-2 text-xs last:border-r-0",
-                  date.weekend && "bg-orange-50/60",
-                  date.muted && "bg-slate-50 text-slate-400"
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "grid h-6 w-6 place-items-center rounded-full font-medium",
-                      date.today && "bg-blue-500 text-white",
-                      !date.today && !date.muted && "text-slate-800"
+            {cells.map((c) => {
+              const isToday = c.key === todayKey;
+              const dayMeetings = meetingsByDate[c.key] || [];
+              const holiday = holidaysByDate[c.key];
+              return (
+                <button
+                  type="button"
+                  key={c.key}
+                  onClick={() => setCreateDate(c.key)}
+                  className={cn(
+                    "min-h-24 border-b border-r border-slate-100 bg-white p-2 text-xs last:border-r-0 text-left hover:bg-slate-50 transition",
+                    c.weekend && "bg-orange-50/60",
+                    c.muted && "bg-slate-50 text-slate-400"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={cn(
+                        "grid h-6 w-6 place-items-center rounded-full font-medium",
+                        isToday && "bg-blue-500 text-white",
+                        !isToday && !c.muted && "text-slate-800"
+                      )}
+                    >
+                      {c.day}
+                    </span>
+                    {isToday && <span className="text-[10px] font-semibold text-blue-600">Today</span>}
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {holiday && (
+                      <div className="rounded bg-amber-50 px-2 py-1">
+                        <p className="truncate font-medium text-amber-700">{holiday.name}</p>
+                      </div>
                     )}
-                  >
-                    {date.day}
-                  </span>
-                  {date.today && <span className="text-[10px] font-semibold text-blue-600">Today</span>}
-                </div>
-                <div className="mt-2 space-y-1">
-                  {date.events?.map((event) => (
-                    <div key={event.label} className="rounded bg-slate-100 px-2 py-1">
-                      <p className={cn("truncate font-medium", event.tone)}>{event.label}</p>
-                      {event.label === "General" && <p className="truncate text-[10px] text-slate-500">9:00 AM - 6:00 PM</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    {c.weekend && !holiday && (
+                      <div className="rounded bg-slate-100 px-2 py-1">
+                        <p className="truncate font-medium text-orange-500">Weekend</p>
+                      </div>
+                    )}
+                    {dayMeetings.map((m: any) => (
+                      <div key={m.id} className="rounded bg-blue-50 px-2 py-1">
+                        <p className="truncate font-medium text-blue-700">{m.title}</p>
+                        <p className="truncate text-[10px] text-slate-500">{m.start_time} - {m.end_time}</p>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </ContentCard>
 
         <div className="space-y-3">
           <ContentCard className="p-4">
             <h3 className="text-sm font-semibold text-slate-900">Today</h3>
-            <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3">
-              <p className="text-sm font-semibold text-slate-900">General Shift</p>
-              <p className="mt-1 text-xs text-slate-600">9:00 AM - 6:00 PM</p>
-              <p className="mt-2 text-xs text-red-500">Yet to check-in</p>
+            <div className="mt-3 space-y-2">
+              {(meetingsByDate[todayKey] || []).length === 0 && (
+                <p className="text-xs text-slate-500">No meetings scheduled today.</p>
+              )}
+              {(meetingsByDate[todayKey] || []).map((m: any) => (
+                <div key={m.id} className="rounded-md border border-blue-100 bg-blue-50 p-3">
+                  <p className="text-sm font-semibold text-slate-900">{m.title}</p>
+                  <p className="mt-1 text-xs text-slate-600">{m.start_time} - {m.end_time}</p>
+                </div>
+              ))}
             </div>
           </ContentCard>
 
           <ContentCard className="p-4">
             <h3 className="text-sm font-semibold text-slate-900">Upcoming Holidays</h3>
             <ul className="mt-3 space-y-3">
-              {holidays.map((holiday) => (
-                <li key={holiday.name} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+              {upcomingHolidays.length === 0 && <li className="text-xs text-slate-500">No upcoming holidays.</li>}
+              {upcomingHolidays.map((holiday: any) => (
+                <li key={holiday.id} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
                   <div>
                     <p className="text-sm font-medium text-slate-900">{holiday.name}</p>
-                    <p className="text-xs text-slate-500">{holiday.day}</p>
+                    <p className="text-xs text-slate-500">{new Date(holiday.holiday_date).toLocaleDateString(undefined, { weekday: "long" })}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-slate-500">{holiday.date}</span>
+                  <span className="shrink-0 text-xs text-slate-500">{new Date(holiday.holiday_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
                 </li>
               ))}
             </ul>
@@ -591,13 +706,21 @@ function CalendarPanel() {
           <ContentCard className="p-4">
             <h3 className="text-sm font-semibold text-slate-900">Legend</h3>
             <div className="mt-3 space-y-2 text-xs text-slate-600">
-              <p><span className="mr-2 inline-block h-2 w-2 rounded-full bg-blue-500" /> Shift</p>
-              <p><span className="mr-2 inline-block h-2 w-2 rounded-full bg-red-500" /> Absent</p>
+              <p><span className="mr-2 inline-block h-2 w-2 rounded-full bg-blue-500" /> Meeting</p>
+              <p><span className="mr-2 inline-block h-2 w-2 rounded-full bg-amber-500" /> Holiday</p>
               <p><span className="mr-2 inline-block h-2 w-2 rounded-full bg-orange-400" /> Weekend</p>
             </div>
           </ContentCard>
         </div>
       </div>
+
+      {createDate && (
+        <CreateMeetingModal
+          date={createDate}
+          onClose={() => setCreateDate(null)}
+          onDone={() => { setCreateDate(null); loadMeetings(); }}
+        />
+      )}
     </div>
   );
 }
@@ -641,6 +764,7 @@ function DashboardWidgets() {
   const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
   const [orgFiles, setOrgFiles] = useState<any[]>([]);
   const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
+  const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
 
   useEffect(() => {
     api.listFiles().then(setOrgFiles).catch(() => {});
@@ -648,6 +772,10 @@ function DashboardWidgets() {
       if (!m.employee_id) return;
       return api.getEmployee(m.employee_id).then(emp => setEmployeeFiles(emp.documents || []));
     }).catch(() => {});
+    const todayKey = new Date().toISOString().slice(0, 10);
+    api.holidays(new Date().getFullYear())
+      .then(rows => setUpcomingHolidays(rows.filter((h: any) => h.holiday_date >= todayKey).slice(0, 5)))
+      .catch(() => {});
   }, []);
 
   return (
@@ -733,17 +861,21 @@ function DashboardWidgets() {
         </WidgetCard>
 
         <WidgetCard title="Upcoming Holidays" icon={CalendarDays}>
-          <ul className="divide-y divide-slate-200">
-            {holidays.map((holiday) => (
-              <li key={holiday.name} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{holiday.name}</p>
-                  <p className="text-xs text-slate-500">{holiday.day}</p>
-                </div>
-                <span className="shrink-0 text-xs text-slate-500">{holiday.date}</span>
-              </li>
-            ))}
-          </ul>
+          {upcomingHolidays.length === 0 ? (
+            <EmptyState text="No upcoming holidays" />
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {upcomingHolidays.map((holiday: any) => (
+                <li key={holiday.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{holiday.name}</p>
+                    <p className="text-xs text-slate-500">{new Date(holiday.holiday_date).toLocaleDateString(undefined, { weekday: "long" })}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-500">{new Date(holiday.holiday_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </WidgetCard>
 
         <WidgetCard title="My Pending Tasks" icon={ListChecks} right={<Badge>0</Badge>}>

@@ -1101,20 +1101,23 @@ function EmployeeInformationService() {
 function UsersService() {
   const router = useRouter();
   const employees = useEmployeeOptions();
+  const [departments, setDepartments] = useState<any[]>([]);
   const [me, setMe] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ email: "", role: "employee" });
+  const [form, setForm] = useState({ email: "", role: "employee", assigned_department_id: "" });
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editForm, setEditForm] = useState({ email: "", employee_id: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [search, setSearch] = useState("");
+  const [savingDeptId, setSavingDeptId] = useState<string | null>(null);
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
+  useEffect(() => { api.departments().then(setDepartments).catch(() => {}); }, []);
 
   async function load() {
     setLoading(true);
@@ -1133,9 +1136,12 @@ function UsersService() {
     if (!form.email.trim()) return;
     setSaving(true); setError("");
     try {
-      const res = await api.createUser(form);
+      const res = await api.createUser({
+        email: form.email, role: form.role,
+        assigned_department_id: form.role === "hr_manager" ? (form.assigned_department_id || null) : null,
+      });
       setCreated({ email: res.email, password: res.temp_password });
-      setForm({ email: "", role: "employee" });
+      setForm({ email: "", role: "employee", assigned_department_id: "" });
       setShowForm(false);
       await load();
     } catch (e: any) { setError(e.message); }
@@ -1146,6 +1152,15 @@ function UsersService() {
     setError("");
     try { await api.updateUserRole(id, role); await load(); }
     catch (e: any) { setError(e.message); }
+  }
+
+  async function changeDepartment(u: any, deptId: string) {
+    setError(""); setSavingDeptId(u.id);
+    try {
+      await api.updateUserProfile(u.id, { email: u.email, employee_id: u.employee_id || null, assigned_department_id: deptId || null });
+      await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSavingDeptId(null); }
   }
 
   async function toggleActive(id: string) {
@@ -1218,15 +1233,16 @@ function UsersService() {
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Employee</th>
               <th className="px-4 py-3 font-medium">Role</th>
+              <th className="px-4 py-3 font-medium">Assigned Dept</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Login</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
+            {loading && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No user accounts found.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No user accounts found.</td></tr>
             )}
             {filtered.map(u => (
               <tr key={u.id} className="border-t border-slate-100">
@@ -1242,6 +1258,21 @@ function UsersService() {
                     <option value="hr_manager">HR Manager</option>
                     <option value="employee">Employee</option>
                   </Select>
+                </td>
+                <td className="px-4 py-3">
+                  {u.role === "hr_manager" ? (
+                    <Select
+                      value={u.assigned_department_id || ""}
+                      onChange={e => changeDepartment(u, e.target.value)}
+                      disabled={savingDeptId === u.id}
+                      className="w-40 h-8 text-xs"
+                    >
+                      <option value="">All departments</option>
+                      {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <Badge tone={u.is_active ? "green" : "slate"}>{u.is_active ? "Active" : "Inactive"}</Badge>
@@ -1300,6 +1331,15 @@ function UsersService() {
               <option value="employee">Employee</option>
             </Select>
           </ModalField>
+          {form.role === "hr_manager" && (
+            <ModalField label="Assigned Department">
+              <Select value={form.assigned_department_id} onChange={e => setForm(f => ({ ...f, assigned_department_id: e.target.value }))}>
+                <option value="">All departments (no restriction)</option>
+                {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </Select>
+              <p className="text-[11px] text-slate-400 mt-1">If set, this HR Manager can only view/edit employees in this department.</p>
+            </ModalField>
+          )}
         </Modal>
       )}
 
