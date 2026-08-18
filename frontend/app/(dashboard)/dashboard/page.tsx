@@ -40,6 +40,7 @@ import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const mainTabs = ["overview", "dashboard", "calendar"];
 const workTabs = [
   "Activities",
@@ -454,6 +455,82 @@ function TimeLogsPanel({ data }: { data: OverviewData }) {
   );
 }
 
+function FilesPanel() {
+  const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
+  const [orgFiles, setOrgFiles] = useState<any[]>([]);
+  const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.listFiles().then(setOrgFiles).catch(() => {});
+    api.me().then(m => {
+      if (!m.employee_id) return;
+      return api.getEmployee(m.employee_id).then(emp => setEmployeeFiles(emp.documents || []));
+    }).catch(() => {});
+  }, []);
+
+  return (
+    <ContentCard className="p-4">
+      <div className="flex gap-4 border-b border-slate-200 text-sm">
+        <button
+          type="button"
+          onClick={() => setFileTab("organization")}
+          className={cn(
+            "border-b-2 pb-2 transition",
+            fileTab === "organization" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"
+          )}
+        >
+          Organization Files
+        </button>
+        <button
+          type="button"
+          onClick={() => setFileTab("employee")}
+          className={cn(
+            "border-b-2 pb-2 transition",
+            fileTab === "employee" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"
+          )}
+        >
+          Employee Files
+        </button>
+      </div>
+      <div className="pt-3">
+        {fileTab === "organization" ? (
+          orgFiles.length ? (
+            <ul className="divide-y divide-slate-200">
+              {orgFiles.map((f: any) => (
+                <li key={f.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">{f.name}</p>
+                    {f.folder && <p className="text-xs text-slate-500">{f.folder}</p>}
+                  </div>
+                  <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                    View
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState text="No organization files found" />
+        ) : (
+          employeeFiles.length ? (
+            <ul className="divide-y divide-slate-200">
+              {employeeFiles.map((f: any) => (
+                <li key={f.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">{f.file_name}</p>
+                    <p className="text-xs text-slate-500">{f.doc_type}</p>
+                  </div>
+                  <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                    View
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState text="No employee files found" />
+        )}
+      </div>
+    </ContentCard>
+  );
+}
+
 function GenericPanel({ title, data }: { title: string; data?: OverviewData }) {
   const moduleState = data?.modules?.[title];
   return (
@@ -758,8 +835,6 @@ function WidgetCard({
   );
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-
 function DashboardWidgets() {
   const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
   const [orgFiles, setOrgFiles] = useState<any[]>([]);
@@ -979,6 +1054,7 @@ function ActivePanel({
   if (active === "Profile") return <ProfilePanel data={data} />;
   if (active === "Attendance") return <AttendancePanel data={data} />;
   if (active === "Time Logs") return <TimeLogsPanel data={data} />;
+  if (active === "Files") return <FilesPanel />;
   return <GenericPanel title={active} data={data} />;
 }
 
@@ -1048,15 +1124,27 @@ function DashboardPageInner() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
+  // Tracks whether the active work-tab has been set (by URL param, the initial
+  // load, or a manual click) — once true, later overview reloads must never
+  // silently override a tab the user has already picked.
+  const workTabInitialized = useRef(false);
 
   useEffect(() => {
     api.dashboardOverview()
       .then((data) => {
         setOverview(data);
-        setWorkTab(requestedTab || data.tabs?.[0] || "Activities");
+        if (!workTabInitialized.current) {
+          setWorkTab(requestedTab || data.tabs?.[0] || "Activities");
+          workTabInitialized.current = true;
+        }
       })
       .catch((error) => setOverviewError(error.message || "Unable to load overview"));
   }, [requestedTab]);
+
+  function selectWorkTab(tab: string) {
+    workTabInitialized.current = true;
+    setWorkTab(tab);
+  }
 
   async function handleCheckIn() {
     setCheckingIn(true);
@@ -1110,7 +1198,7 @@ function DashboardPageInner() {
             {mainTab === "overview" && (
               overview ? (
                 <>
-                  <WorkTabs tabs={overview.tabs.length ? overview.tabs : workTabs} active={workTab} setActive={setWorkTab} />
+                  <WorkTabs tabs={overview.tabs.length ? overview.tabs : workTabs} active={workTab} setActive={selectWorkTab} />
                   <ActivePanel active={workTab} data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} />
                   {overviewError && <p className="text-xs text-red-500">{overviewError}</p>}
                 </>

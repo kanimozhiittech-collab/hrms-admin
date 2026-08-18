@@ -47,7 +47,8 @@ files_router = APIRouter(prefix="/api/files", tags=["files"])
 
 @files_router.get("", response_model=List[OrgFileOut])
 def list_files(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_hr(user)
+    # Any authenticated employee can view/download organization files —
+    # only uploading and deleting are HR-restricted.
     return (
         db.query(OrgFile)
         .filter(OrgFile.company_id == user.company_id)
@@ -84,7 +85,7 @@ def upload_file(
 
 @files_router.get("/raw/{fname}")
 def get_file(fname: str, user: User = Depends(current_user)):
-    _require_hr(user)
+    # Any authenticated employee can download organization files.
     fpath = UPLOAD_DIR / fname
     if not fpath.exists():
         raise HTTPException(404)
