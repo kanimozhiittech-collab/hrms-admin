@@ -47,6 +47,21 @@ export const api = {
     form.append("file", file);
     return request<any>(`/api/employees/${id}/documents`, { method: "POST", body: form });
   },
+  uploadEmployeePhoto: (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<any>(`/api/employees/${id}/photo`, { method: "POST", body: form });
+  },
+  uploadEducationFile: (empId: string, eduId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ id: string; file_name: string; file_url: string }>(`/api/employees/${empId}/education/${eduId}/file`, { method: "POST", body: form });
+  },
+  uploadExperienceFile: (empId: string, expId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ id: string; file_name: string; file_url: string }>(`/api/employees/${empId}/experience/${expId}/file`, { method: "POST", body: form });
+  },
 
   // ── Files ──
   listFiles: () => request<any[]>("/api/files"),
@@ -172,6 +187,11 @@ export const api = {
       method: "PUT", body: JSON.stringify({ allocated, year }),
     }),
   applyLeave: (data: any) => request<any>("/api/leave/requests", { method: "POST", body: JSON.stringify(data) }),
+  uploadLeaveDocument: (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<any>(`/api/leave/requests/${id}/document`, { method: "POST", body: form });
+  },
   myLeaveRequests: (params: Record<string, any> = {}) => {
     const q = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") q.set(k, String(v)); });
@@ -191,4 +211,9 @@ export const api = {
     if (year) q.set("year", String(year));
     return request<any[]>(`/api/leave/calendar?${q.toString()}`);
   },
+
+  // ── Support Tickets ──
+  listSupportTickets: () => request<any[]>("/api/support/tickets"),
+  createSupportTicket: (data: { subject: string; description?: string; priority?: string }) =>
+    request<any>("/api/support/tickets", { method: "POST", body: JSON.stringify(data) }),
 };

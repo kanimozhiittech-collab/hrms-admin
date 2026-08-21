@@ -104,6 +104,8 @@ class EducationRecord(Base):
     year_from: Mapped[int | None] = mapped_column(Integer)
     year_to: Mapped[int | None] = mapped_column(Integer)
     grade: Mapped[str | None] = mapped_column(String(20))
+    file_name: Mapped[str | None] = mapped_column(String(200))
+    file_url: Mapped[str | None] = mapped_column(String(500))
     employee: Mapped["Employee"] = relationship(back_populates="education")
 
 
@@ -116,6 +118,8 @@ class ExperienceRecord(Base):
     from_date: Mapped[date | None] = mapped_column(Date)
     to_date: Mapped[date | None] = mapped_column(Date)
     description: Mapped[str | None] = mapped_column(Text)
+    file_name: Mapped[str | None] = mapped_column(String(200))
+    file_url: Mapped[str | None] = mapped_column(String(500))
     employee: Mapped["Employee"] = relationship(back_populates="experience")
 
 

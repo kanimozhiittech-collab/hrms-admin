@@ -16,11 +16,19 @@ from typing import List, Optional
 router = APIRouter(prefix="/api/meta", tags=["meta"])
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
+ADMIN_ROLES = {"super_admin", "company_admin"}
 
 
 def _require_hr(user: User):
     if user.role not in HR_ROLES:
         raise HTTPException(status_code=403, detail="Not authorized")
+
+
+def _require_admin(user: User):
+    """Deleting org-structure records (departments/designations/locations) is
+    admin-only -- HR managers can create/edit but not delete."""
+    if user.role not in ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail="Only company admins can delete this")
 
 
 def _dept_names(db: Session, company_id: str, depts: List[Department]) -> tuple[dict, dict]:
@@ -109,7 +117,7 @@ def reassign_department_employees(
 
 @router.delete("/departments/{dept_id}", status_code=204)
 def delete_department(dept_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_hr(user)
+    _require_admin(user)
     dept = db.query(Department).filter(Department.id == dept_id, Department.company_id == user.company_id).first()
     if not dept:
         return None
@@ -184,7 +192,7 @@ def reassign_designation_employees(
 
 @router.delete("/designations/{designation_id}", status_code=204)
 def delete_designation(designation_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_hr(user)
+    _require_admin(user)
     designation = db.query(Designation).filter(
         Designation.id == designation_id, Designation.company_id == user.company_id
     ).first()
@@ -231,7 +239,7 @@ def update_location(location_id: str, payload: LocationIn, db: Session = Depends
 
 @router.delete("/locations/{location_id}", status_code=204)
 def delete_location(location_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_hr(user)
+    _require_admin(user)
     location = db.query(WorkLocation).filter(
         WorkLocation.id == location_id, WorkLocation.company_id == user.company_id
     ).first()

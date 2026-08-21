@@ -34,6 +34,16 @@ const SERVICES = [
   { key: "general", label: "General", icon: Settings2, status: "ready" as const },
 ];
 
+/** Deleting departments/designations/locations/employees is admin-only —
+ * hr_manager can create/edit but not delete. */
+function useIsAdmin() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    api.me().then(m => setIsAdmin(["super_admin", "company_admin"].includes(m.role))).catch(() => {});
+  }, []);
+  return isAdmin;
+}
+
 function useEmployeeOptions() {
   const [employees, setEmployees] = useState<any[]>([]);
   useEffect(() => {
@@ -203,6 +213,7 @@ function ReassignDeleteModal({
 }
 
 function DepartmentsService() {
+  const isAdmin = useIsAdmin();
   const headOptions = useManageAccountsEmployeeOptions();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,9 +312,11 @@ function DepartmentsService() {
             <button onClick={() => startEdit(d)} className="text-slate-400 hover:text-slate-700">
               <Pencil className="h-3.5 w-3.5"/>
             </button>
-            <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
-              <Trash2 className="h-3.5 w-3.5"/>
-            </button>
+            {isAdmin && (
+              <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5"/>
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -366,6 +379,7 @@ function DepartmentsService() {
 }
 
 function DesignationsService() {
+  const isAdmin = useIsAdmin();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -454,9 +468,11 @@ function DesignationsService() {
             <button onClick={() => startEdit(d)} className="text-slate-400 hover:text-slate-700">
               <Pencil className="h-3.5 w-3.5"/>
             </button>
-            <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
-              <Trash2 className="h-3.5 w-3.5"/>
-            </button>
+            {isAdmin && (
+              <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5"/>
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -510,6 +526,7 @@ const BLANK_LOCATION = {
 };
 
 function LocationsService() {
+  const isAdmin = useIsAdmin();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -595,9 +612,11 @@ function LocationsService() {
             <button onClick={() => startEdit(l)} className="text-slate-400 hover:text-slate-700">
               <Pencil className="h-3.5 w-3.5"/>
             </button>
-            <button onClick={() => remove(l.id)} className="text-slate-400 hover:text-red-600">
-              <Trash2 className="h-3.5 w-3.5"/>
-            </button>
+            {isAdmin && (
+              <button onClick={() => remove(l.id)} className="text-slate-400 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5"/>
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -722,7 +741,7 @@ function OrganizationDetailsService() {
                   : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
                 <div>
                   <label className="text-sm text-brand-600 hover:underline cursor-pointer">
-                    {uploadingLogo ? "Uploading…" : "Change"}
+                    {uploadingLogo ? "Uploading…" : company?.logo_url ? "Change" : "Add Logo"}
                     <input
                       type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
                       onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
@@ -1115,6 +1134,8 @@ function UsersService() {
   const [editForm, setEditForm] = useState({ email: "", employee_id: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [savingDeptId, setSavingDeptId] = useState<string | null>(null);
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
@@ -1129,8 +1150,10 @@ function UsersService() {
   useEffect(() => { load(); }, []);
 
   const filtered = items.filter((u: any) =>
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    (u.employee_name || "").toLowerCase().includes(search.toLowerCase())
+    (u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.employee_name || "").toLowerCase().includes(search.toLowerCase())) &&
+    (!roleFilter || u.role === roleFilter) &&
+    (!statusFilter || (statusFilter === "active" ? u.is_active : !u.is_active))
   );
 
   async function add() {
@@ -1208,6 +1231,17 @@ function UsersService() {
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="text-sm text-slate-500">{filtered.length} user account{filtered.length === 1 ? "" : "s"}</div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search accounts…" />
+        <Select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="max-w-[160px]">
+          <option value="">All Roles</option>
+          <option value="company_admin">Company Admin</option>
+          <option value="hr_manager">HR Manager</option>
+          <option value="employee">Employee</option>
+        </Select>
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[140px]">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </Select>
         <Button size="sm" onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4" />Add User
         </Button>
@@ -1491,6 +1525,7 @@ function HrLettersService() {
   const [form, setForm] = useState({ employee_id: "", letter_type: "Bonafide Letter", date_of_request: new Date().toISOString().slice(0, 10), reason: "" });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1501,8 +1536,9 @@ function HrLettersService() {
   useEffect(() => { load(); }, []);
 
   const filtered = items.filter((r: any) =>
-    (r.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (r.letter_type || "").toLowerCase().includes(search.toLowerCase())
+    ((r.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.letter_type || "").toLowerCase().includes(search.toLowerCase())) &&
+    (!statusFilter || r.status === statusFilter)
   );
 
   async function add() {
@@ -1524,6 +1560,12 @@ function HrLettersService() {
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="text-sm text-slate-500">{filtered.length} request{filtered.length === 1 ? "" : "s"}</div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search requests…" />
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[140px]">
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Issued">Issued</option>
+          <option value="Rejected">Rejected</option>
+        </Select>
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Request</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
@@ -1614,6 +1656,7 @@ function TasksService() {
   const [form, setForm] = useState({ name: "", description: "", owner_id: "", start_date: "", due_date: "", priority: "Moderate" });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1624,8 +1667,9 @@ function TasksService() {
   useEffect(() => { load(); }, []);
 
   const filtered = items.filter((t: any) =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    (t.owner_name || "").toLowerCase().includes(search.toLowerCase())
+    (t.name.toLowerCase().includes(search.toLowerCase()) ||
+      (t.owner_name || "").toLowerCase().includes(search.toLowerCase())) &&
+    (!statusFilter || t.status === statusFilter)
   );
 
   async function add() {
@@ -1661,6 +1705,12 @@ function TasksService() {
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="text-sm text-slate-500">{filtered.length} task{filtered.length === 1 ? "" : "s"}</div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search tasks…" />
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[150px]">
+          <option value="">All Status</option>
+          <option value="Open">Open</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+        </Select>
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Task</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
@@ -1745,6 +1795,7 @@ function GeneralService() {
   const [form, setForm] = useState({ employee_id: "", separation_date: new Date().toISOString().slice(0, 10), interviewer_id: "", reason: "", feedback: "" });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1755,7 +1806,8 @@ function GeneralService() {
   useEffect(() => { load(); }, []);
 
   const filtered = items.filter((r: any) =>
-    (r.employee_name || "").toLowerCase().includes(search.toLowerCase())
+    (r.employee_name || "").toLowerCase().includes(search.toLowerCase()) &&
+    (!statusFilter || r.status === statusFilter)
   );
 
   async function add() {
@@ -1781,6 +1833,11 @@ function GeneralService() {
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="text-sm text-slate-500">{filtered.length} exit record{filtered.length === 1 ? "" : "s"}</div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search exit records…" />
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[140px]">
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+        </Select>
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Exit Details</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}

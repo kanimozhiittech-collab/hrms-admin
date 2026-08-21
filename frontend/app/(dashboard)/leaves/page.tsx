@@ -8,9 +8,10 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { Plus, X, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
+import { Plus, X, CheckCircle2, XCircle, CalendarDays, Search, Upload } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 const STATUS_TONE: Record<string, any> = {
   approved: "green", rejected: "red", pending: "amber", cancelled: "slate",
@@ -35,6 +36,9 @@ export default function LeavesPage() {
 
   const [showApply, setShowApply] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [approvalSearch, setApprovalSearch] = useState("");
+  const [calendarSearch, setCalendarSearch] = useState("");
 
   // Show the Approvals tab for HR/Admin, and for any manager who has at least
   // one direct report — the backend scopes /requests/team accordingly.
@@ -59,6 +63,10 @@ export default function LeavesPage() {
   async function approve(id: string) { await api.approveLeave(id); onApproved(); }
   async function reject(id: string) { await api.rejectLeave(id, "Rejected"); onApproved(); }
   async function cancel(id: string) { await api.cancelLeave(id); loadMy(); }
+
+  const filteredRequests = requests.filter(r => !statusFilter || r.status === statusFilter);
+  const filteredPending = pending.filter(r => (r.employee_name || "").toLowerCase().includes(approvalSearch.toLowerCase()));
+  const filteredCalendar = calendar.filter(c => (c.employee_name || "").toLowerCase().includes(calendarSearch.toLowerCase()));
 
   const tabs: { key: typeof tab; label: string }[] = [
     { key: "my", label: "My Leaves" },
@@ -107,7 +115,16 @@ export default function LeavesPage() {
             </div>
 
             <Card>
-              <div className="px-4 py-3 border-b border-slate-100 font-medium text-slate-800">My Requests</div>
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-medium text-slate-800">My Requests</span>
+                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
+                  <option value="">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                </Select>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-slate-600">
@@ -116,13 +133,14 @@ export default function LeavesPage() {
                       <th className="px-4 py-3 font-medium">Dates</th>
                       <th className="px-4 py-3 font-medium">Days</th>
                       <th className="px-4 py-3 font-medium">Reason</th>
+                      <th className="px-4 py-3 font-medium">Doc</th>
                       <th className="px-4 py-3 font-medium">Status</th>
                       <th className="px-4 py-3 font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No leave requests yet.</td></tr>}
-                    {requests.map(r => (
+                    {filteredRequests.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No leave requests match.</td></tr>}
+                    {filteredRequests.map(r => (
                       <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1.5">
@@ -136,6 +154,11 @@ export default function LeavesPage() {
                         </td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{r.days_count}</td>
                         <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{r.reason}</td>
+                        <td className="px-4 py-3">
+                          {r.file_url ? (
+                            <a href={`${API_BASE}${r.file_url}`} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline">View</a>
+                          ) : "—"}
+                        </td>
                         <td className="px-4 py-3"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>
                         <td className="px-4 py-3">
                           {(r.status === "pending" || r.status === "approved") && (
@@ -154,10 +177,19 @@ export default function LeavesPage() {
         {/* ── APPROVALS ── */}
         {tab === "approvals" && (
           <div className="space-y-3">
+            {pending.length > 0 && (
+              <div className="relative max-w-xs">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <Input placeholder="Search employee…" value={approvalSearch} onChange={e => setApprovalSearch(e.target.value)} className="pl-8" />
+              </div>
+            )}
             {pending.length === 0 && (
               <Card className="p-10 text-center text-slate-400 text-sm">No leave requests pending your approval.</Card>
             )}
-            {pending.map(r => (
+            {pending.length > 0 && filteredPending.length === 0 && (
+              <Card className="p-10 text-center text-slate-400 text-sm">No requests match your search.</Card>
+            )}
+            {filteredPending.map(r => (
               <Card key={r.id} className="p-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-semibold">
@@ -188,13 +220,17 @@ export default function LeavesPage() {
         {/* ── CALENDAR ── */}
         {tab === "calendar" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={calMonth} onChange={e => setCalMonth(+e.target.value)} className="max-w-[140px]">
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </Select>
               <Select value={calYear} onChange={e => setCalYear(+e.target.value)} className="max-w-[120px]">
                 {[calYear + 1, calYear, calYear - 1].map(y => <option key={y} value={y}>{y}</option>)}
               </Select>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <Input placeholder="Search employee…" value={calendarSearch} onChange={e => setCalendarSearch(e.target.value)} className="pl-8 max-w-[200px]" />
+              </div>
             </div>
             <Card>
               <div className="px-4 py-3 border-b border-slate-100 font-medium text-slate-800 flex items-center gap-2">
@@ -202,8 +238,8 @@ export default function LeavesPage() {
                 Approved Leave — {MONTHS[calMonth - 1]} {calYear}
               </div>
               <div className="divide-y divide-slate-100">
-                {calendar.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No approved leave this month.</div>}
-                {calendar.map(c => (
+                {filteredCalendar.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No approved leave match.</div>}
+                {filteredCalendar.map(c => (
                   <div key={c.id} className="px-4 py-3 flex items-center gap-3" style={{ borderLeft: `3px solid ${c.color}` }}>
                     <div className="flex-1">
                       <div className="text-sm font-medium text-slate-800">{c.employee_name}</div>
@@ -245,6 +281,7 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
   });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
 
   const balMap = useMemo(() => Object.fromEntries(balances.map((b: any) => [b.leave_type_id, b])), [balances]);
   const selected = balMap[form.leave_type_id];
@@ -255,7 +292,8 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
     try {
       const body: any = { ...form };
       if (!form.half_day) delete body.half_day_session;
-      await api.applyLeave(body);
+      const res = await api.applyLeave(body);
+      if (docFile) await api.uploadLeaveDocument(res.id, docFile);
       onDone();
     } catch (e: any) {
       setErr(e.message || "Failed to apply.");
@@ -304,6 +342,20 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
           <div>
             <label className="text-xs font-medium text-slate-600">Reason</label>
             <Textarea rows={3} value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} required placeholder="Reason for leave" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">Supporting Document (optional)</label>
+            <div>
+              <input
+                id="leave-doc-file"
+                type="file"
+                className="sr-only"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+              />
+              <label htmlFor="leave-doc-file" className="inline-flex items-center gap-1.5 mt-1 text-sm text-brand-700 cursor-pointer hover:underline">
+                <Upload className="h-3.5 w-3.5" />{docFile ? docFile.name : "Attach medical certificate or other proof"}
+              </label>
+            </div>
           </div>
           {selected && (
             <div className="text-xs text-slate-500 bg-slate-50 rounded-md px-3 py-2">

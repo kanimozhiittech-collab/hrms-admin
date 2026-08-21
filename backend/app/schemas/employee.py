@@ -12,19 +12,25 @@ class AddressIn(BaseModel):
     pincode: Optional[str] = None
 
 class EducationIn(BaseModel):
+    id: Optional[str] = None
     institute: Optional[str] = None
     degree: Optional[str] = None
     specialization: Optional[str] = None
     year_from: Optional[int] = None
     year_to: Optional[int] = None
     grade: Optional[str] = None
+    file_name: Optional[str] = None
+    file_url: Optional[str] = None
 
 class ExperienceIn(BaseModel):
+    id: Optional[str] = None
     company_name: Optional[str] = None
     designation: Optional[str] = None
     from_date: Optional[date] = None
     to_date: Optional[date] = None
     description: Optional[str] = None
+    file_name: Optional[str] = None
+    file_url: Optional[str] = None
 
 class DependentIn(BaseModel):
     name: str
@@ -48,7 +54,7 @@ class DocumentOut(BaseModel):
 
 class EmployeeIn(BaseModel):
     # Personal
-    emp_code: str
+    emp_code: Optional[str] = None
     prefix: Optional[str] = None
     first_name: str
     middle_name: Optional[str] = None

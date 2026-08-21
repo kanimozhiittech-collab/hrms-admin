@@ -19,7 +19,7 @@ import { Plus, Trash2, Upload, Save, X } from "lucide-react";
 /* ---------- Schema ---------- */
 const schema = z.object({
   // Personal
-  emp_code: z.string().min(1, "Required"),
+  emp_code: z.string().optional().or(z.literal("")),
   prefix: z.string().optional().or(z.literal("")),
   first_name: z.string().min(1, "Required"),
   middle_name: z.string().optional().or(z.literal("")),
@@ -79,19 +79,25 @@ const schema = z.object({
     pincode: z.string().optional().or(z.literal("")),
   })),
   education: z.array(z.object({
+    id: z.string().optional().or(z.literal("")),
     institute: z.string().optional().or(z.literal("")),
     degree: z.string().optional().or(z.literal("")),
     specialization: z.string().optional().or(z.literal("")),
     year_from: z.coerce.number().optional().or(z.literal("")),
     year_to: z.coerce.number().optional().or(z.literal("")),
     grade: z.string().optional().or(z.literal("")),
+    file_name: z.string().optional().or(z.literal("")),
+    file_url: z.string().optional().or(z.literal("")),
   })),
   experience: z.array(z.object({
+    id: z.string().optional().or(z.literal("")),
     company_name: z.string().optional().or(z.literal("")),
     designation: z.string().optional().or(z.literal("")),
     from_date: z.string().optional().or(z.literal("")),
     to_date: z.string().optional().or(z.literal("")),
     description: z.string().optional().or(z.literal("")),
+    file_name: z.string().optional().or(z.literal("")),
+    file_url: z.string().optional().or(z.literal("")),
   })),
   dependents: z.array(z.object({
     name: z.string().min(1),
@@ -143,12 +149,14 @@ export function employeeToFormValues(e: any): EmployeeFormValues {
     city: a.city ?? "", state: a.state ?? "", country: a.country ?? "", pincode: a.pincode ?? "",
   }));
   out.education = (e.education || []).map((x: any) => ({
-    institute: x.institute ?? "", degree: x.degree ?? "", specialization: x.specialization ?? "",
+    id: x.id ?? "", institute: x.institute ?? "", degree: x.degree ?? "", specialization: x.specialization ?? "",
     year_from: x.year_from ?? "", year_to: x.year_to ?? "", grade: x.grade ?? "",
+    file_name: x.file_name ?? "", file_url: x.file_url ?? "",
   }));
   out.experience = (e.experience || []).map((x: any) => ({
-    company_name: x.company_name ?? "", designation: x.designation ?? "",
+    id: x.id ?? "", company_name: x.company_name ?? "", designation: x.designation ?? "",
     from_date: x.from_date ?? "", to_date: x.to_date ?? "", description: x.description ?? "",
+    file_name: x.file_name ?? "", file_url: x.file_url ?? "",
   }));
   out.dependents = (e.dependents || []).map((x: any) => ({
     name: x.name ?? "", relationship_type: x.relationship_type ?? "",
@@ -170,16 +178,60 @@ function Field({ label, error, children }: any) {
   );
 }
 
-function TextField({ name, label, type = "text", placeholder }: any) {
+function TextField({ name, label, type = "text", placeholder, disabled }: any) {
   const { register, formState: { errors } } = useFormContext();
   const err = (errors as any)[name]?.message;
-  return <Field label={label} error={err}><Input type={type} placeholder={placeholder} {...register(name)}/></Field>;
+  return <Field label={label} error={err}><Input type={type} placeholder={placeholder} disabled={disabled} {...register(name)}/></Field>;
 }
 
 function SelectField({ name, label, children }: any) {
   const { register, formState: { errors } } = useFormContext();
   const err = (errors as any)[name]?.message;
   return <Field label={label} error={err}><Select {...register(name)}>{children}</Select></Field>;
+}
+
+/** Small inline upload control used next to PAN/Aadhaar/Passport — the file is
+ * queued and uploaded (via the generic employee-documents endpoint) right after
+ * the employee record itself is saved. */
+function StatutoryDocUpload({ docType, file, existing, onSelect }: {
+  docType: string; file?: File; existing?: { file_url: string; file_name: string };
+  onSelect: (f: File) => void;
+}) {
+  const inputId = `statutory-doc-${docType}`;
+  return (
+    <div className="mt-1 text-xs">
+      <input id={inputId} type="file" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); }}/>
+      <label htmlFor={inputId} className="inline-flex items-center gap-1 text-brand-700 cursor-pointer hover:underline">
+        <Upload className="h-3 w-3"/>
+        {file ? file.name : existing ? "Replace document" : `Upload ${docType} document`}
+      </label>
+      {!file && existing && (
+        <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${existing.file_url}`} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">View current</a>
+      )}
+    </div>
+  );
+}
+
+/** Per-row certificate/letter upload used in Education and Experience — same
+ * deferred-until-save pattern as the photo/statutory uploads above. */
+function RowFileUpload({ id, label, file, existingUrl, existingName, onSelect }: {
+  id: string; label: string; file?: File; existingUrl?: string; existingName?: string;
+  onSelect: (f: File) => void;
+}) {
+  return (
+    <div className="text-xs">
+      <input id={id} type="file" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); }}/>
+      <label htmlFor={id} className="inline-flex items-center gap-1 text-brand-700 cursor-pointer hover:underline">
+        <Upload className="h-3 w-3"/>
+        {file ? file.name : existingUrl ? "Replace" : label}
+      </label>
+      {!file && existingUrl && (
+        <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${existingUrl}`} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">
+          {existingName || "View"}
+        </a>
+      )}
+    </div>
+  );
 }
 
 /* ---------- Shared form used by both Add Employee and Edit Employee ---------- */
@@ -199,6 +251,11 @@ export function EmployeeForm({
   const [meta, setMeta] = useState<{depts: any[]; desigs: any[]; locs: any[]; shifts: any[]; managers: any[]}>({depts:[],desigs:[],locs:[],shifts:[],managers:[]});
   const [docType, setDocType] = useState("Aadhaar");
   const [docFile, setDocFile] = useState<File | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [statutoryFiles, setStatutoryFiles] = useState<Record<string, File>>({});
+  const [eduFiles, setEduFiles] = useState<Record<number, File>>({});
+  const [expFiles, setExpFiles] = useState<Record<number, File>>({});
+  const [sameAsPresent, setSameAsPresent] = useState(false);
 
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
@@ -212,8 +269,41 @@ export function EmployeeForm({
 
   const eduFA = useFieldArray({ control: methods.control, name: "education" });
   const expFA = useFieldArray({ control: methods.control, name: "experience" });
+
+  /** Removing a row shifts every later row's index down by one — re-key the
+   * pending-file map so an already-selected file stays attached to its row. */
+  function reindexAfterRemove(files: Record<number, File>, removedIndex: number): Record<number, File> {
+    const next: Record<number, File> = {};
+    for (const [k, v] of Object.entries(files)) {
+      const idx = Number(k);
+      if (idx === removedIndex) continue;
+      next[idx > removedIndex ? idx - 1 : idx] = v;
+    }
+    return next;
+  }
+  function removeEdu(i: number) { eduFA.remove(i); setEduFiles(f => reindexAfterRemove(f, i)); }
+  function removeExp(i: number) { expFA.remove(i); setExpFiles(f => reindexAfterRemove(f, i)); }
   const depFA = useFieldArray({ control: methods.control, name: "dependents" });
   const emgFA = useFieldArray({ control: methods.control, name: "emergency_contacts" });
+
+  async function uploadPendingFiles(res: any) {
+    if (docFile) {
+      await api.uploadEmployeeDocument(res.id, docType, docFile);
+      toast.success(`${docFile.name} uploaded`);
+    }
+    if (photoFile) await api.uploadEmployeePhoto(res.id, photoFile);
+    for (const [type, file] of Object.entries(statutoryFiles)) {
+      await api.uploadEmployeeDocument(res.id, type, file);
+    }
+    for (const [idxStr, file] of Object.entries(eduFiles)) {
+      const row = res.education?.[Number(idxStr)];
+      if (row?.id) await api.uploadEducationFile(res.id, row.id, file);
+    }
+    for (const [idxStr, file] of Object.entries(expFiles)) {
+      const row = res.experience?.[Number(idxStr)];
+      if (row?.id) await api.uploadExperienceFile(res.id, row.id, file);
+    }
+  }
 
   async function onSubmit(values: EmployeeFormValues, saveAndNew = false) {
     const clean: any = { ...values };
@@ -221,18 +311,12 @@ export function EmployeeForm({
     try {
       if (mode === "edit" && employeeId) {
         const res = await api.updateEmployee(employeeId, clean);
-        if (docFile) {
-          await api.uploadEmployeeDocument(res.id, docType, docFile);
-          toast.success(`${docFile.name} uploaded`);
-        }
+        await uploadPendingFiles(res);
         toast.success(`${res.first_name} ${res.last_name} updated`);
         router.push(`/employees/${res.id}`);
       } else {
         const res = await api.createEmployee(clean);
-        if (docFile) {
-          await api.uploadEmployeeDocument(res.id, docType, docFile);
-          toast.success(`${docFile.name} uploaded`);
-        }
+        await uploadPendingFiles(res);
         if (linkUserId) {
           await api.updateUserProfile(linkUserId, { email: res.work_email, employee_id: res.id });
           toast.success(`${res.first_name} ${res.last_name} created and linked to the login account`);
@@ -242,6 +326,10 @@ export function EmployeeForm({
         if (saveAndNew && !linkUserId) {
           methods.reset();
           setDocFile(null);
+          setPhotoFile(null);
+          setStatutoryFiles({});
+          setEduFiles({});
+          setExpFiles({});
         } else {
           router.push(`/employees/${res.id}`);
         }
@@ -250,9 +338,9 @@ export function EmployeeForm({
   }
 
   const tabs = [
-    ["personal","Personal"],["contact","Contact"],["job","Job"],
-    ["comp","Compensation & Statutory"],["education","Education"],
-    ["family","Experience & Family"],["docs","Documents"],
+    ["personal","Personal"],["contact","Contact"],["family","Family"],
+    ["job","Job"],["comp","Compensation & Statutory (India)"],
+    ["education","Education"],["experience","Past Experience"],["docs","Documents"],
   ];
 
   return (
@@ -287,8 +375,39 @@ export function EmployeeForm({
 
                 {/* PERSONAL */}
                 <TabsContent value="personal">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="h-16 w-16 rounded-full overflow-hidden bg-slate-100 border border-slate-200 grid place-items-center shrink-0">
+                      {photoFile ? (
+                        <img src={URL.createObjectURL(photoFile)} alt="Photo preview" className="h-full w-full object-cover"/>
+                      ) : methods.watch("photo_url") ? (
+                        <img src={`${process.env.NEXT_PUBLIC_API_URL || ""}${methods.watch("photo_url")}`} alt="Photo" className="h-full w-full object-cover"/>
+                      ) : (
+                        <Upload className="h-6 w-6 text-slate-300"/>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        id="employee-photo-file"
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+                      />
+                      <label htmlFor="employee-photo-file" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 cursor-pointer hover:underline">
+                        <Upload className="h-3.5 w-3.5"/>{photoFile ? photoFile.name : "Upload Photo"}
+                      </label>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {photoFile ? "Uploaded when you save." : "JPG or PNG."}
+                      </p>
+                    </div>
+                  </div>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <TextField name="emp_code" label="Employee ID *" placeholder="EMP-001"/>
+                    <TextField
+                      name="emp_code"
+                      label="Employee ID"
+                      placeholder={mode === "create" ? "Auto-generated on save" : ""}
+                      disabled={mode === "create"}
+                    />
                     <SelectField name="prefix" label="Prefix">
                       <option value="">—</option><option>Mr</option><option>Ms</option><option>Mrs</option><option>Dr</option>
                     </SelectField>
@@ -308,7 +427,6 @@ export function EmployeeForm({
                       <option value="">—</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
                     </SelectField>
                     <TextField name="nationality" label="Nationality" placeholder="Indian"/>
-                    <TextField name="photo_url" label="Photo URL"/>
                   </div>
                 </TabsContent>
 
@@ -323,14 +441,34 @@ export function EmployeeForm({
                   <div className="mt-6 grid md:grid-cols-2 gap-6">
                     {[0,1].map(i => (
                       <div key={i} className="space-y-3 p-4 rounded-lg border border-slate-200">
-                        <div className="text-sm font-semibold text-slate-900">{i===0?"Present Address":"Permanent Address"}</div>
-                        <TextField name={`addresses.${i}.line1`} label="Address Line 1"/>
-                        <TextField name={`addresses.${i}.line2`} label="Address Line 2"/>
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold text-slate-900">{i===0?"Present Address":"Permanent Address"}</div>
+                          {i === 1 && (
+                            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={sameAsPresent}
+                                onChange={(e) => {
+                                  setSameAsPresent(e.target.checked);
+                                  if (e.target.checked) {
+                                    const present = methods.getValues("addresses.0");
+                                    (["line1","line2","city","state","country","pincode"] as const).forEach(f =>
+                                      methods.setValue(`addresses.1.${f}`, present[f])
+                                    );
+                                  }
+                                }}
+                              />
+                              Same as Present Address
+                            </label>
+                          )}
+                        </div>
+                        <TextField name={`addresses.${i}.line1`} label="Address Line 1" disabled={i===1 && sameAsPresent}/>
+                        <TextField name={`addresses.${i}.line2`} label="Address Line 2" disabled={i===1 && sameAsPresent}/>
                         <div className="grid grid-cols-2 gap-3">
-                          <TextField name={`addresses.${i}.city`} label="City"/>
-                          <TextField name={`addresses.${i}.state`} label="State"/>
-                          <TextField name={`addresses.${i}.country`} label="Country"/>
-                          <TextField name={`addresses.${i}.pincode`} label="Pincode"/>
+                          <TextField name={`addresses.${i}.city`} label="City" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.state`} label="State" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.country`} label="Country" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.pincode`} label="Pincode" disabled={i===1 && sameAsPresent}/>
                         </div>
                       </div>
                     ))}
@@ -398,12 +536,27 @@ export function EmployeeForm({
                   <div className="mt-6">
                     <div className="text-sm font-semibold text-slate-900 mb-3">Statutory (India)</div>
                     <div className="grid md:grid-cols-3 gap-4">
-                      <TextField name="pan_number" label="PAN"/>
-                      <TextField name="aadhaar_number" label="Aadhaar"/>
+                      <div>
+                        <TextField name="pan_number" label="PAN"/>
+                        <StatutoryDocUpload docType="PAN" file={statutoryFiles.PAN}
+                          existing={(initialValues as any)?.documents?.find?.((d: any) => d.doc_type === "PAN")}
+                          onSelect={(f) => setStatutoryFiles(s => ({ ...s, PAN: f }))}/>
+                      </div>
+                      <div>
+                        <TextField name="aadhaar_number" label="Aadhaar"/>
+                        <StatutoryDocUpload docType="Aadhaar" file={statutoryFiles.Aadhaar}
+                          existing={(initialValues as any)?.documents?.find?.((d: any) => d.doc_type === "Aadhaar")}
+                          onSelect={(f) => setStatutoryFiles(s => ({ ...s, Aadhaar: f }))}/>
+                      </div>
                       <TextField name="uan_number" label="UAN"/>
                       <TextField name="pf_number" label="PF Number"/>
                       <TextField name="esi_number" label="ESI Number"/>
-                      <TextField name="passport_number" label="Passport Number"/>
+                      <div>
+                        <TextField name="passport_number" label="Passport Number"/>
+                        <StatutoryDocUpload docType="Passport" file={statutoryFiles.Passport}
+                          existing={(initialValues as any)?.documents?.find?.((d: any) => d.doc_type === "Passport")}
+                          onSelect={(f) => setStatutoryFiles(s => ({ ...s, Passport: f }))}/>
+                      </div>
                       <TextField name="passport_expiry" label="Passport Expiry" type="date"/>
                     </div>
                   </div>
@@ -420,7 +573,17 @@ export function EmployeeForm({
                         <TextField name={`education.${i}.year_from`} label="From" type="number"/>
                         <TextField name={`education.${i}.year_to`} label="To" type="number"/>
                         <TextField name={`education.${i}.grade`} label="Grade"/>
-                        <button type="button" onClick={() => eduFA.remove(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
+                        <div className="md:col-span-6">
+                          <RowFileUpload
+                            id={`edu-file-${f.id}`}
+                            label="Upload Certificate"
+                            file={eduFiles[i]}
+                            existingUrl={methods.watch(`education.${i}.file_url`)}
+                            existingName={methods.watch(`education.${i}.file_name`)}
+                            onSelect={(file) => setEduFiles(s => ({ ...s, [i]: file }))}
+                          />
+                        </div>
+                        <button type="button" onClick={() => removeEdu(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
                       </div>
                     ))}
                     <Button type="button" variant="outline" size="sm" onClick={() => eduFA.append({ institute:"", degree:"", specialization:"", grade:"" } as any)}><Plus className="h-4 w-4"/>Add Education</Button>
@@ -429,25 +592,7 @@ export function EmployeeForm({
 
                 {/* FAMILY + EXPERIENCE */}
                 <TabsContent value="family">
-                  <div className="text-sm font-semibold text-slate-900 mb-3">Past Experience</div>
-                  <div className="space-y-3">
-                    {expFA.fields.map((f, i) => (
-                      <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-4 gap-3 relative">
-                        <TextField name={`experience.${i}.company_name`} label="Company"/>
-                        <TextField name={`experience.${i}.designation`} label="Designation"/>
-                        <TextField name={`experience.${i}.from_date`} label="From" type="date"/>
-                        <TextField name={`experience.${i}.to_date`} label="To" type="date"/>
-                        <div className="md:col-span-4">
-                          <Label>Description</Label>
-                          <Textarea {...methods.register(`experience.${i}.description`)}/>
-                        </div>
-                        <button type="button" onClick={() => expFA.remove(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
-                      </div>
-                    ))}
-                    <Button type="button" variant="outline" size="sm" onClick={() => expFA.append({ company_name:"", designation:"", from_date:"", to_date:"", description:"" } as any)}><Plus className="h-4 w-4"/>Add Experience</Button>
-                  </div>
-
-                  <div className="text-sm font-semibold text-slate-900 mt-8 mb-3">Dependents</div>
+                  <div className="text-sm font-semibold text-slate-900 mb-3">Dependents</div>
                   <div className="space-y-3">
                     {depFA.fields.map((f, i) => (
                       <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-5 gap-3 relative">
@@ -477,6 +622,36 @@ export function EmployeeForm({
                       </div>
                     ))}
                     <Button type="button" variant="outline" size="sm" onClick={() => emgFA.append({ name:"", relationship_type:"", mobile:"", address:"" } as any)}><Plus className="h-4 w-4"/>Add Contact</Button>
+                  </div>
+                </TabsContent>
+
+                {/* PAST EXPERIENCE */}
+                <TabsContent value="experience">
+                  <div className="space-y-3">
+                    {expFA.fields.map((f, i) => (
+                      <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-4 gap-3 relative">
+                        <TextField name={`experience.${i}.company_name`} label="Company"/>
+                        <TextField name={`experience.${i}.designation`} label="Designation"/>
+                        <TextField name={`experience.${i}.from_date`} label="From" type="date"/>
+                        <TextField name={`experience.${i}.to_date`} label="To" type="date"/>
+                        <div className="md:col-span-4">
+                          <Label>Description</Label>
+                          <Textarea {...methods.register(`experience.${i}.description`)}/>
+                        </div>
+                        <div className="md:col-span-4">
+                          <RowFileUpload
+                            id={`exp-file-${f.id}`}
+                            label="Upload Relieving/Experience Letter"
+                            file={expFiles[i]}
+                            existingUrl={methods.watch(`experience.${i}.file_url`)}
+                            existingName={methods.watch(`experience.${i}.file_name`)}
+                            onSelect={(file) => setExpFiles(s => ({ ...s, [i]: file }))}
+                          />
+                        </div>
+                        <button type="button" onClick={() => removeExp(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => expFA.append({ company_name:"", designation:"", from_date:"", to_date:"", description:"" } as any)}><Plus className="h-4 w-4"/>Add Experience</Button>
                   </div>
                 </TabsContent>
 

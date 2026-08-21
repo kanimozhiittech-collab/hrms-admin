@@ -37,7 +37,11 @@ def provision_company(body: ProvisionCompanyIn, db: Session = Depends(get_db)):
         n += 1
         slug = f"{base_slug}-{n}"
 
-    company = Company(name=body.company_name, subdomain=slug)
+    company = Company(
+        name=body.company_name, subdomain=slug,
+        contact_email=body.admin_email, contact_number=body.phone,
+        super_admin_company_id=body.company_id,
+    )
     db.add(company)
     db.flush()
 

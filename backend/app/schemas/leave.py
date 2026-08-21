@@ -87,6 +87,8 @@ class LeaveRequestOut(BaseModel):
     half_day_session: Optional[str] = None
     days_count: float
     reason: str
+    file_name: Optional[str] = None
+    file_url: Optional[str] = None
     status: str
     review_comment: Optional[str] = None
     reviewed_at: Optional[datetime] = None

@@ -86,6 +86,8 @@ class LeaveRequest(Base):
     half_day_session: Mapped[str | None] = mapped_column(String(12), nullable=True)  # first_half | second_half
     days_count: Mapped[float] = mapped_column(Float, default=0)
     reason: Mapped[str] = mapped_column(String(500))
+    file_name: Mapped[str | None] = mapped_column(String(200))
+    file_url: Mapped[str | None] = mapped_column(String(500))
     status: Mapped[str] = mapped_column(String(20), default=LR_PENDING)
     reviewed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     review_comment: Mapped[str | None] = mapped_column(String(500), nullable=True)

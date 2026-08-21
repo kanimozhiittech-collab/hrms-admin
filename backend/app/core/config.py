@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     SEED_ON_BOOT: str = "1"
     PROVISION_SECRET: str = "dev-provision-secret"
+    SUPER_ADMIN_URL: str = "http://localhost:8001"
 
     class Config:
         env_file = ".env"

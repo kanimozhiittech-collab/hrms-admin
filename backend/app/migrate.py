@@ -57,6 +57,7 @@ NEW_COLUMNS = {
         "country": "VARCHAR(100)",
         "postal_code": "VARCHAR(20)",
         "logo_url": "VARCHAR(500)",
+        "super_admin_company_id": "INTEGER",
     },
     "shifts": {
         "color": "VARCHAR(20)",
@@ -66,6 +67,18 @@ NEW_COLUMNS = {
     },
     "hr_tasks": {
         "start_date": "DATE",
+    },
+    "employee_education": {
+        "file_name": "VARCHAR(200)",
+        "file_url": "VARCHAR(500)",
+    },
+    "employee_experience": {
+        "file_name": "VARCHAR(200)",
+        "file_url": "VARCHAR(500)",
+    },
+    "leave_requests": {
+        "file_name": "VARCHAR(200)",
+        "file_url": "VARCHAR(500)",
     },
 }
 

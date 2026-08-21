@@ -4,12 +4,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError
 from pathlib import Path
-import shutil, tempfile, uuid
+import re, shutil, tempfile, uuid
 from typing import Optional
 from ..database import get_db
 from ..models import (Employee, EmployeeAddress, EducationRecord, ExperienceRecord,
                       Dependent, EmergencyContact, EmployeeDocument, Department, Designation, User,
-                      LeaveBalance, LeaveRequest)
+                      LeaveBalance, LeaveRequest, Company)
 from ..models.attendance import AttendanceLog, RegularizationRequest
 from ..models.services import OrgFile
 from ..schemas import EmployeeIn, EmployeeOut, EmployeeListResponse, EmployeeListItem, DocumentOut
@@ -17,14 +17,15 @@ from ..core.security import hash_password
 from .deps import current_user
 
 router = APIRouter(prefix="/api/employees", tags=["employees"])
-# Serverless filesystems (e.g. Vercel) are read-only outside the OS temp dir,
-# so store there instead of a project-relative "uploads" folder.
-UPLOAD_DIR = Path(tempfile.gettempdir()) / "hrms_uploads"
+# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
+# Windows/antivirus and silently loses uploaded files, which happened in prod.
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 # Default password every new employee uses for their first login.
 DEFAULT_EMPLOYEE_PASSWORD = "Welcome@123"
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
+ADMIN_ROLES = {"super_admin", "company_admin"}
 
 # Employee statuses that should block that person's login until they're re-activated.
 BLOCKING_STATUSES = {"Inactive", "Resigned", "Terminated"}
@@ -33,6 +34,32 @@ BLOCKING_STATUSES = {"Inactive", "Resigned", "Terminated"}
 def _require_hr(user: User):
     if user.role not in HR_ROLES:
         raise HTTPException(403, "Only HR/Admin can access the employee directory")
+
+
+def _require_admin(user: User):
+    """Deleting an employee record is admin-only -- HR managers can create/edit
+    but not permanently remove someone's profile."""
+    if user.role not in ADMIN_ROLES:
+        raise HTTPException(403, "Only company admins can delete an employee")
+
+
+def _company_code_prefix(name: str) -> str:
+    words = re.findall(r"[A-Za-z0-9]+", name or "")
+    if not words:
+        return "EMP"
+    if len(words) == 1:
+        return words[0][:3].upper()
+    return "".join(w[0] for w in words[:4]).upper()
+
+
+def _generate_emp_code(db: Session, company_id: str, company_name: str) -> str:
+    prefix = _company_code_prefix(company_name)
+    n = db.query(Employee).filter(Employee.company_id == company_id).count() + 1
+    code = f"{prefix}-{n:04d}"
+    while db.query(Employee).filter(Employee.company_id == company_id, Employee.emp_code == code).first():
+        n += 1
+        code = f"{prefix}-{n:04d}"
+    return code
 
 
 def _dept_scope(user: User) -> Optional[str]:
@@ -47,8 +74,8 @@ def _dept_scope(user: User) -> Optional[str]:
 def _serialize(e: Employee) -> dict:
     d = {c.name: getattr(e, c.name) for c in Employee.__table__.columns}
     d["addresses"] = [{c.name: getattr(a, c.name) for c in EmployeeAddress.__table__.columns if c.name not in ("id","employee_id")} for a in e.addresses]
-    d["education"] = [{c.name: getattr(x, c.name) for c in EducationRecord.__table__.columns if c.name not in ("id","employee_id")} for x in e.education]
-    d["experience"] = [{c.name: getattr(x, c.name) for c in ExperienceRecord.__table__.columns if c.name not in ("id","employee_id")} for x in e.experience]
+    d["education"] = [{c.name: getattr(x, c.name) for c in EducationRecord.__table__.columns if c.name != "employee_id"} for x in e.education]
+    d["experience"] = [{c.name: getattr(x, c.name) for c in ExperienceRecord.__table__.columns if c.name != "employee_id"} for x in e.experience]
     d["dependents"] = [{c.name: getattr(x, c.name) for c in Dependent.__table__.columns if c.name not in ("id","employee_id")} for x in e.dependents]
     d["emergency_contacts"] = [{c.name: getattr(x, c.name) for c in EmergencyContact.__table__.columns if c.name not in ("id","employee_id")} for x in e.emergency_contacts]
     d["documents"] = [DocumentOut.model_validate(x).model_dump() for x in e.documents]
@@ -140,14 +167,22 @@ def create_employee(body: EmployeeIn, db: Session = Depends(get_db), user: User 
     _require_hr(user)
     if db.query(Employee).filter(Employee.work_email == body.work_email).first():
         raise HTTPException(400, "Work email already exists")
-    if db.query(Employee).filter(Employee.company_id == user.company_id, Employee.emp_code == body.emp_code).first():
-        raise HTTPException(400, "Employee code already exists")
 
-    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts"})
-    e = Employee(company_id=user.company_id, **data)
+    emp_code = body.emp_code
+    if emp_code:
+        if db.query(Employee).filter(Employee.company_id == user.company_id, Employee.emp_code == emp_code).first():
+            raise HTTPException(400, "Employee code already exists")
+    else:
+        company = db.query(Company).filter(Company.id == user.company_id).first()
+        emp_code = _generate_emp_code(db, user.company_id, company.name if company else "")
+
+    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code"})
+    e = Employee(company_id=user.company_id, emp_code=emp_code, **data)
     for a in body.addresses: e.addresses.append(EmployeeAddress(**a.model_dump()))
-    for x in body.education: e.education.append(EducationRecord(**x.model_dump()))
-    for x in body.experience: e.experience.append(ExperienceRecord(**x.model_dump()))
+    edu_rows = [EducationRecord(**x.model_dump(exclude={"id"})) for x in body.education]
+    exp_rows = [ExperienceRecord(**x.model_dump(exclude={"id"})) for x in body.experience]
+    for r in edu_rows: e.education.append(r)
+    for r in exp_rows: e.experience.append(r)
     for x in body.dependents: e.dependents.append(Dependent(**x.model_dump()))
     for x in body.emergency_contacts: e.emergency_contacts.append(EmergencyContact(**x.model_dump()))
     db.add(e); db.commit(); db.refresh(e)
@@ -166,7 +201,13 @@ def create_employee(body: EmployeeIn, db: Session = Depends(get_db), user: User 
             ))
             db.commit()
 
-    return _serialize(e)
+    result = _serialize(e)
+    # Relationship collections lose submission order after refresh/expire — return
+    # education/experience from the objects we appended in request order instead,
+    # so the frontend can reliably map "row i" to "row i's real id" for file uploads.
+    result["education"] = [{c.name: getattr(x, c.name) for c in EducationRecord.__table__.columns if c.name != "employee_id"} for x in edu_rows]
+    result["experience"] = [{c.name: getattr(x, c.name) for c in ExperienceRecord.__table__.columns if c.name != "employee_id"} for x in exp_rows]
+    return result
 
 
 @router.put("/{emp_id}", response_model=EmployeeOut)
@@ -179,12 +220,16 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
         raise HTTPException(403, "This employee is outside your assigned department")
     if scope and body.department_id != scope:
         raise HTTPException(403, "You can only assign employees to your own department")
-    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts"})
+    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code"})
     for k, v in data.items(): setattr(e, k, v)
+    if body.emp_code:
+        e.emp_code = body.emp_code
     e.addresses.clear(); e.education.clear(); e.experience.clear(); e.dependents.clear(); e.emergency_contacts.clear()
     for a in body.addresses: e.addresses.append(EmployeeAddress(**a.model_dump()))
-    for x in body.education: e.education.append(EducationRecord(**x.model_dump()))
-    for x in body.experience: e.experience.append(ExperienceRecord(**x.model_dump()))
+    edu_rows = [EducationRecord(**x.model_dump(exclude={"id"})) for x in body.education]
+    exp_rows = [ExperienceRecord(**x.model_dump(exclude={"id"})) for x in body.experience]
+    for r in edu_rows: e.education.append(r)
+    for r in exp_rows: e.experience.append(r)
     for x in body.dependents: e.dependents.append(Dependent(**x.model_dump()))
     for x in body.emergency_contacts: e.emergency_contacts.append(EmergencyContact(**x.model_dump()))
 
@@ -196,12 +241,15 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
         login.is_active = e.status not in BLOCKING_STATUSES
 
     db.commit(); db.refresh(e)
-    return _serialize(e)
+    result = _serialize(e)
+    result["education"] = [{c.name: getattr(x, c.name) for c in EducationRecord.__table__.columns if c.name != "employee_id"} for x in edu_rows]
+    result["experience"] = [{c.name: getattr(x, c.name) for c in ExperienceRecord.__table__.columns if c.name != "employee_id"} for x in exp_rows]
+    return result
 
 
 @router.delete("/{emp_id}", status_code=204)
 def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    _require_hr(user)
+    _require_admin(user)
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
 
@@ -250,3 +298,61 @@ def upload_document(emp_id: str, doc_type: str = Form(...), file: UploadFile = F
                            file_url=f"/api/employees/files/{fname}")
     db.add(doc); db.commit(); db.refresh(doc)
     return doc
+
+
+@router.post("/{emp_id}/photo", response_model=EmployeeOut)
+def upload_photo(emp_id: str, file: UploadFile = File(...),
+                 db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role not in HR_ROLES and user.employee_id != emp_id:
+        raise HTTPException(403, "Not authorized")
+    e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
+    if not e: raise HTTPException(404, "Not found")
+    ext = Path(file.filename or "").suffix or ".jpg"
+    fname = f"{uuid.uuid4().hex}{ext}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    fpath = UPLOAD_DIR / fname
+    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
+    e.photo_url = f"/api/employees/files/{fname}"
+    db.commit(); db.refresh(e)
+    return _serialize(e)
+
+
+def _save_upload(file: UploadFile) -> tuple[str, str]:
+    ext = Path(file.filename or "").suffix
+    fname = f"{uuid.uuid4().hex}{ext}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    fpath = UPLOAD_DIR / fname
+    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
+    return file.filename or fname, f"/api/employees/files/{fname}"
+
+
+@router.post("/{emp_id}/education/{edu_id}/file")
+def upload_education_file(emp_id: str, edu_id: str, file: UploadFile = File(...),
+                          db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role not in HR_ROLES and user.employee_id != emp_id:
+        raise HTTPException(403, "Not authorized")
+    row = (db.query(EducationRecord)
+           .join(Employee, Employee.id == EducationRecord.employee_id)
+           .filter(EducationRecord.id == edu_id, EducationRecord.employee_id == emp_id,
+                   Employee.company_id == user.company_id)
+           .first())
+    if not row: raise HTTPException(404, "Not found")
+    row.file_name, row.file_url = _save_upload(file)
+    db.commit()
+    return {"id": row.id, "file_name": row.file_name, "file_url": row.file_url}
+
+
+@router.post("/{emp_id}/experience/{exp_id}/file")
+def upload_experience_file(emp_id: str, exp_id: str, file: UploadFile = File(...),
+                           db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role not in HR_ROLES and user.employee_id != emp_id:
+        raise HTTPException(403, "Not authorized")
+    row = (db.query(ExperienceRecord)
+           .join(Employee, Employee.id == ExperienceRecord.employee_id)
+           .filter(ExperienceRecord.id == exp_id, ExperienceRecord.employee_id == emp_id,
+                   Employee.company_id == user.company_id)
+           .first())
+    if not row: raise HTTPException(404, "Not found")
+    row.file_name, row.file_url = _save_upload(file)
+    db.commit()
+    return {"id": row.id, "file_name": row.file_name, "file_url": row.file_url}
