@@ -1,12 +1,13 @@
 import re
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..core.security import hash_password
 from ..database import get_db
-from ..models import Company, Shift, User, WorkLocation
+from ..models import Company, Employee, Shift, User, WorkLocation
 from ..schemas import ProvisionCompanyIn
 from ..seed import _add_holidays, _add_leave_types
 
@@ -57,3 +58,29 @@ def provision_company(body: ProvisionCompanyIn, db: Session = Depends(get_db)):
     db.add(admin)
     db.commit()
     return {"status": "created", "company_id": company.id}
+
+
+@router.delete("/companies", dependencies=[Depends(_require_provision_secret)])
+def deprovision_company(admin_email: str, db: Session = Depends(get_db)):
+    """Mirror of provision_company, called when a company is deleted on the
+    Super Admin side, so a re-registration under the same email doesn't hit
+    the "already_exists" branch above. Refuses to touch a tenant that has any
+    real employee data — this is only for cleaning up empty/test tenants."""
+    admin = db.query(User).filter(User.email == admin_email, User.role == "company_admin").first()
+    if not admin:
+        return {"status": "not_found"}
+
+    company_id = admin.company_id
+    if db.query(Employee).filter(Employee.company_id == company_id).count() > 0:
+        raise HTTPException(400, "This tenant has employee data and can't be auto-deprovisioned")
+
+    db.execute(text("DELETE FROM users WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM work_locations WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM shifts WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM leave_types WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM holidays WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM departments WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM designations WHERE company_id = :cid"), {"cid": company_id})
+    db.execute(text("DELETE FROM companies WHERE id = :cid"), {"cid": company_id})
+    db.commit()
+    return {"status": "deleted", "company_id": company_id}
