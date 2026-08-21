@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import Base, engine
 from .core.config import settings
 from . import models  # noqa
-from .routers import auth, employees, dashboard, meta, attendance, leave, provisioning, users, company
+from .routers import auth, employees, dashboard, meta, attendance, leave, provisioning, users, company, support
 from .routers.services import files_router, letters_router, tasks_router, general_router, meetings_router
 from .seed import seed_if_empty, ensure_defaults
 
@@ -15,6 +15,17 @@ app.add_middleware(
     allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
     allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _allow_private_network(request, call_next):
+    """Chrome's Private Network Access blocks any request targeting a LAN IP
+    (e.g. testing via http://192.168.x.x instead of localhost) unless the
+    preflight response explicitly opts in with this header."""
+    response = await call_next(request)
+    if request.headers.get("access-control-request-private-network") == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 @app.on_event("startup")
 def _startup():
@@ -39,6 +50,7 @@ app.include_router(tasks_router)
 app.include_router(general_router)
 app.include_router(meetings_router)
 app.include_router(company.router)
+app.include_router(support.router)
 
 @app.get("/")
 def root():

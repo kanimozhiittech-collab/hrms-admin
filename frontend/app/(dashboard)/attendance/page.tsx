@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { Download, Clock, CalendarClock, CheckCircle2, XCircle } from "lucide-react";
+import { Download, Clock, CalendarClock, CheckCircle2, XCircle, Search } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -37,8 +37,12 @@ export default function AttendancePage() {
   const [summary, setSummary] = useState<any>(null);
   const [team, setTeam] = useState<any[]>([]);
   const [teamDate, setTeamDate] = useState(now.toISOString().slice(0, 10));
+  const [teamSearch, setTeamSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [regs, setRegs] = useState<any[]>([]);
+  const [teamRegs, setTeamRegs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
 
   // regularization form
   const [regForm, setRegForm] = useState({ work_date: now.toISOString().slice(0, 10), check_in: "", check_out: "", reason: "" });
@@ -57,12 +61,16 @@ export default function AttendancePage() {
     finally { setLoading(false); }
   }
   async function loadRegs() {
-    setRegs(await api.listRegularizations(isHR && tab === "regularize" ? "my" : "my"));
+    setRegs(await api.listRegularizations("my"));
+  }
+  async function loadTeamRegs() {
+    setTeamRegs(await api.listRegularizations("team"));
   }
 
   useEffect(() => { if (tab === "my") loadMy(); }, [tab, month, year]);
   useEffect(() => { if (tab === "team") loadTeam(); }, [tab, teamDate]);
   useEffect(() => { if (tab === "regularize") loadRegs(); }, [tab]);
+  useEffect(() => { if (tab === "regularize" && isHR) loadTeamRegs(); }, [tab, isHR]);
 
   async function submitReg(e: React.FormEvent) {
     e.preventDefault();
@@ -80,11 +88,30 @@ export default function AttendancePage() {
     }
   }
 
+  async function reviewReg(id: string, action: "approve" | "reject") {
+    setReviewBusyId(id);
+    try {
+      if (action === "approve") await api.approveRegularization(id);
+      else await api.rejectRegularization(id);
+      await loadTeamRegs();
+    } catch (err: any) {
+      setMsg({ tone: "err", text: err.message || "Failed to update request." });
+    } finally {
+      setReviewBusyId(null);
+    }
+  }
+
   const tabs: { key: typeof tab; label: string }[] = [
     { key: "my", label: "My Attendance" },
     ...(isHR ? [{ key: "team" as const, label: "Team Attendance" }] : []),
     { key: "regularize", label: "Regularization" },
   ];
+
+  const myLogs = (summary?.logs || []).filter((l: any) => !statusFilter || l.status === statusFilter);
+  const teamFiltered = team.filter((l: any) =>
+    (!statusFilter || l.status === statusFilter) &&
+    (l.employee_name || "").toLowerCase().includes(teamSearch.toLowerCase())
+  );
 
   return (
     <>
@@ -105,12 +132,16 @@ export default function AttendancePage() {
         {/* ── MY ATTENDANCE ── */}
         {tab === "my" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={month} onChange={e => setMonth(+e.target.value)} className="max-w-[140px]">
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </Select>
               <Select value={year} onChange={e => setYear(+e.target.value)} className="max-w-[120px]">
                 {[year + 1, year, year - 1, year - 2].map(y => <option key={y} value={y}>{y}</option>)}
+              </Select>
+              <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
+                <option value="">All Status</option>
+                {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
               </Select>
             </div>
 
@@ -147,10 +178,10 @@ export default function AttendancePage() {
                   </thead>
                   <tbody>
                     {loading && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
-                    {!loading && (!summary || summary.logs.length === 0) && (
-                      <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No attendance records this month.</td></tr>
+                    {!loading && myLogs.length === 0 && (
+                      <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No attendance records match.</td></tr>
                     )}
-                    {summary?.logs.map((l: any) => (
+                    {myLogs.map((l: any) => (
                       <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3 text-slate-700">{new Date(l.work_date).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })}</td>
                         <td className="px-4 py-3">
@@ -175,7 +206,17 @@ export default function AttendancePage() {
         {tab === "team" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Input type="date" value={teamDate} onChange={e => setTeamDate(e.target.value)} className="max-w-[180px]" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input type="date" value={teamDate} onChange={e => setTeamDate(e.target.value)} className="max-w-[180px]" />
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input placeholder="Search employee…" value={teamSearch} onChange={e => setTeamSearch(e.target.value)} className="pl-8 max-w-[200px]" />
+                </div>
+                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
+                  <option value="">All Status</option>
+                  {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                </Select>
+              </div>
               <a href={api.attendanceReportUrl(month, year)} target="_blank" rel="noreferrer">
                 <Button variant="outline"><Download className="h-4 w-4" />Export Month CSV</Button>
               </a>
@@ -195,10 +236,10 @@ export default function AttendancePage() {
                   </thead>
                   <tbody>
                     {loading && <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Loading…</td></tr>}
-                    {!loading && team.length === 0 && (
+                    {!loading && teamFiltered.length === 0 && (
                       <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No attendance logged for this date.</td></tr>
                     )}
-                    {team.map((l: any) => (
+                    {teamFiltered.map((l: any) => (
                       <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3 font-medium text-slate-800">{l.employee_name || "—"}</td>
                         <td className="px-4 py-3"><Badge tone={STATUS_TONE[l.status] || "slate"}>{STATUS_LABEL[l.status] || l.status}</Badge></td>
@@ -266,6 +307,50 @@ export default function AttendancePage() {
                 ))}
               </div>
             </Card>
+
+            {isHR && (
+              <Card className="md:col-span-2">
+                <div className="px-4 py-3 border-b border-slate-100 font-medium text-slate-800 flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-brand-600" />
+                  Team Regularization Requests
+                  {teamRegs.filter((r: any) => r.status === "pending").length > 0 && (
+                    <span className="rounded-full bg-amber-100 text-amber-700 px-1.5 text-[10px]">
+                      {teamRegs.filter((r: any) => r.status === "pending").length} pending
+                    </span>
+                  )}
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {teamRegs.length === 0 && (
+                    <div className="px-4 py-10 text-center text-slate-400 text-sm">No regularization requests from your team.</div>
+                  )}
+                  {teamRegs.map((r: any) => (
+                    <div key={r.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="text-sm font-medium text-slate-800">
+                          {r.employee_name || "—"} · {new Date(r.work_date).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {fmtTime(r.requested_check_in)} – {fmtTime(r.requested_check_out)} · {r.reason}
+                        </div>
+                      </div>
+                      {r.status === "pending" ? (
+                        <div className="flex gap-2">
+                          <Button size="sm" disabled={reviewBusyId === r.id} onClick={() => reviewReg(r.id, "approve")}>
+                            <CheckCircle2 className="h-4 w-4" />Approve
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={reviewBusyId === r.id} onClick={() => reviewReg(r.id, "reject")}
+                            className="text-red-600 border-red-200 hover:bg-red-50">
+                            <XCircle className="h-4 w-4" />Reject
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge tone={r.status === "approved" ? "green" : "red"}>{r.status}</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
         )}
       </div>

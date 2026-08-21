@@ -24,6 +24,10 @@ class Company(Base):
     country: Mapped[str | None] = mapped_column(String(100))
     postal_code: Mapped[str | None] = mapped_column(String(20))
     logo_url: Mapped[str | None] = mapped_column(String(500))
+    # This company's row id in the Super Admin app's own DB — set at provisioning
+    # time, used to route support tickets and other cross-app calls to the
+    # right Super Admin company record.
+    super_admin_company_id: Mapped[int | None] = mapped_column(Integer)
 
 class Department(Base):
     __tablename__ = "departments"

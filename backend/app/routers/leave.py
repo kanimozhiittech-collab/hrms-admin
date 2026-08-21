@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import date, datetime
+from pathlib import Path
+import shutil, uuid
 from typing import List, Optional
 
 from ..database import get_db
 from ..models import (
-    AttendanceLog, Department, Employee, Holiday, LeaveBalance, LeaveRequest, LeaveType, User,
+    AttendanceLog, Employee, Holiday, LeaveBalance, LeaveRequest, LeaveType, User,
 )
 from ..models.attendance import ATT_ON_LEAVE, ATT_HALF_DAY
 from ..models.leave import LR_PENDING, LR_APPROVED, LR_REJECTED, LR_CANCELLED
@@ -17,6 +20,9 @@ from ..core.worktime import working_days, iter_dates, is_weekend
 from .deps import current_user
 
 router = APIRouter(prefix="/api/leave", tags=["leave"])
+# Persistent local folder (gitignored) -- matches the pattern used for employee
+# uploads; the OS temp dir gets cleared by Windows/antivirus and silently loses files.
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
 
@@ -30,18 +36,10 @@ def _own_employee_id(db: Session, user: User) -> Optional[str]:
     return emp.id if emp else None
 
 
-def _led_department_ids(db: Session, company_id: str, my_emp_id: str) -> List[str]:
-    """Departments this employee is the Head of, if any."""
-    return [
-        d.id for d in db.query(Department.id)
-        .filter(Department.company_id == company_id, Department.lead_id == my_emp_id)
-        .all()
-    ]
-
-
 def _can_review(db: Session, user: User, req: LeaveRequest) -> bool:
     """HR can review anyone's request; a reporting manager can review their own
-    reports'; a Department Head can also review anyone in their department."""
+    reports'. Department Head is deliberately NOT a review path — only HR and
+    the employee's actual reporting manager should approve/reject leave."""
     if _is_hr(user):
         return True
     my_emp_id = _own_employee_id(db, user)
@@ -50,10 +48,7 @@ def _can_review(db: Session, user: User, req: LeaveRequest) -> bool:
     target = db.query(Employee).filter(Employee.id == req.employee_id).first()
     if not target:
         return False
-    if target.reporting_manager_id == my_emp_id:
-        return True
-    led_dept_ids = _led_department_ids(db, user.company_id, my_emp_id)
-    return bool(target.department_id and target.department_id in led_dept_ids)
+    return target.reporting_manager_id == my_emp_id
 
 
 def _resolve_employee(db: Session, user: User) -> Employee | None:
@@ -139,6 +134,8 @@ def _request_to_out(r: LeaveRequest, names: dict, types: dict) -> LeaveRequestOu
         half_day_session=r.half_day_session,
         days_count=r.days_count,
         reason=r.reason,
+        file_name=r.file_name,
+        file_url=r.file_url,
         status=r.status,
         review_comment=r.review_comment,
         reviewed_at=r.reviewed_at,
@@ -387,6 +384,38 @@ def apply_leave(
     return _request_to_out(req, names, types)
 
 
+@router.post("/requests/{request_id}/document", response_model=LeaveRequestOut)
+def upload_leave_document(
+    request_id: str, file: UploadFile = File(...),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    """Attach a supporting document (medical certificate etc.) to a leave
+    request — only the requester themselves can attach one, and only while
+    it's still pending (once reviewed, the record shouldn't keep changing)."""
+    req = db.query(LeaveRequest).filter(
+        LeaveRequest.id == request_id, LeaveRequest.company_id == user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+    if req.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You can only attach documents to your own request")
+    if req.status != LR_PENDING:
+        raise HTTPException(status_code=400, detail="Cannot attach a document to a reviewed request")
+
+    ext = Path(file.filename or "").suffix
+    fname = f"{uuid.uuid4().hex}{ext}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    fpath = UPLOAD_DIR / fname
+    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
+    req.file_name = file.filename or fname
+    req.file_url = f"/api/employees/files/{fname}"
+    db.commit()
+    db.refresh(req)
+    names = _name_map(db, user.company_id)
+    types = _type_map(db, user.company_id)
+    return _request_to_out(req, names, types)
+
+
 @router.get("/requests", response_model=List[LeaveRequestOut])
 def my_requests(
     status: Optional[str] = Query(default=None),
@@ -422,13 +451,6 @@ def team_requests(
                 .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
                 .all()
             )
-            led_dept_ids = _led_department_ids(db, user.company_id, my_emp_id)
-            if led_dept_ids:
-                reviewable_ids.update(
-                    e.id for e in db.query(Employee.id)
-                    .filter(Employee.company_id == user.company_id, Employee.department_id.in_(led_dept_ids))
-                    .all()
-                )
         if not reviewable_ids:
             raise HTTPException(status_code=403, detail="Not authorized")
         q = q.filter(LeaveRequest.employee_id.in_(reviewable_ids))

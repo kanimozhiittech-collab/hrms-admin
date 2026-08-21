@@ -25,3 +25,4 @@ from .services import (
     MeetingIn, MeetingOut,
 )
 from .company import CompanyUpdateIn, CompanyOut
+from .support import SupportTicketIn, SupportTicketOut

@@ -23,7 +23,9 @@ from ..schemas import (
 from .deps import current_user
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
-UPLOAD_DIR = Path(tempfile.gettempdir()) / "hrms_uploads"
+# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
+# Windows/antivirus and silently loses uploaded files, which happened in prod.
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 
 def _require_hr(user: User):
@@ -84,8 +86,11 @@ def upload_file(
 
 
 @files_router.get("/raw/{fname}")
-def get_file(fname: str, user: User = Depends(current_user)):
-    # Any authenticated employee can download organization files.
+def get_file(fname: str):
+    # No auth here, same as the other file-serving routes (employee documents,
+    # company logo) — a plain <a href> / new-tab click can't carry the
+    # Authorization header, and the random filename is the effective capability
+    # token, so this matches the existing pattern rather than fighting it.
     fpath = UPLOAD_DIR / fname
     if not fpath.exists():
         raise HTTPException(404)

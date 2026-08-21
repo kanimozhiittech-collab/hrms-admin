@@ -15,7 +15,6 @@ import {
   CircleUserRound,
   Clock3,
   FileText,
-  Filter,
   Folder,
   HeartPulse,
   Link2,
@@ -24,7 +23,6 @@ import {
   Mail,
   Megaphone,
   MoreHorizontal,
-  Moon,
   Phone,
   Plus,
   RefreshCw,
@@ -42,6 +40,10 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const mainTabs = ["overview", "dashboard", "calendar"];
+// Admin logins (super_admin/company_admin) often have no linked Employee record
+// of their own, so check-in/attendance tracking doesn't apply to them — only
+// hr_manager and employee logins (real staff) see the check-in button.
+const ADMIN_ROLES = ["super_admin", "company_admin"];
 const workTabs = [
   "Activities",
   "Feeds",
@@ -184,10 +186,12 @@ function ProfileCard({
   data,
   onCheckIn,
   checkingIn,
+  isAdmin,
 }: {
   data: OverviewData;
   onCheckIn: () => void;
   checkingIn: boolean;
+  isAdmin: boolean;
 }) {
   return (
     <aside className="relative z-10 w-full shrink-0 rounded-md border border-slate-200 bg-white px-4 pb-4 pt-0 text-center shadow-sm lg:w-56">
@@ -197,23 +201,27 @@ function ProfileCard({
       <p className="mt-3 text-sm font-semibold text-slate-900">
         {data.profile.employee_code} - {data.profile.name}
       </p>
-      <p className="mt-1 text-xs text-red-500">{data.profile.status_text}</p>
-      <div className="mt-2 flex justify-center gap-1 text-sm font-semibold text-slate-900">
-        {data.profile.timer.map((item, index) => (
-          <span key={index} className="rounded bg-slate-100 px-1.5 py-0.5">
-            {item}
-          </span>
-        ))}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={checkingIn}
-        onClick={onCheckIn}
-        className="mt-3 h-8 w-28 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-      >
-        {checkingIn ? "Saving..." : data.profile.check_in_button}
-      </Button>
+      {!isAdmin && (
+        <>
+          <p className="mt-1 text-xs text-red-500">{data.profile.status_text}</p>
+          <div className="mt-2 flex justify-center gap-1 text-sm font-semibold text-slate-900">
+            {data.profile.timer.map((item, index) => (
+              <span key={index} className="rounded bg-slate-100 px-1.5 py-0.5">
+                {item}
+              </span>
+            ))}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checkingIn}
+            onClick={onCheckIn}
+            className="mt-3 h-8 w-28 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+          >
+            {checkingIn ? "Saving..." : data.profile.check_in_button}
+          </Button>
+        </>
+      )}
     </aside>
   );
 }
@@ -250,10 +258,12 @@ function ActivitiesPanel({
   data,
   onCheckIn,
   checkingIn,
+  isAdmin,
 }: {
   data: OverviewData;
   onCheckIn: () => void;
   checkingIn: boolean;
+  isAdmin: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -285,15 +295,17 @@ function ActivitiesPanel({
           <p className="font-semibold text-slate-900">{data.shift.name}</p>
           <p>{data.shift.start_time}-{data.shift.end_time}</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={checkingIn}
-          onClick={onCheckIn}
-          className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-        >
-          {checkingIn ? "Saving..." : data.profile.check_in_button}
-        </Button>
+        {!isAdmin && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checkingIn}
+            onClick={onCheckIn}
+            className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+          >
+            {checkingIn ? "Saving..." : data.profile.check_in_button}
+          </Button>
+        )}
       </ContentCard>
 
       <ContentCard className="p-4">
@@ -1044,13 +1056,15 @@ function ActivePanel({
   data,
   onCheckIn,
   checkingIn,
+  isAdmin,
 }: {
   active: string;
   data: OverviewData;
   onCheckIn: () => void;
   checkingIn: boolean;
+  isAdmin: boolean;
 }) {
-  if (active === "Activities") return <ActivitiesPanel data={data} onCheckIn={onCheckIn} checkingIn={checkingIn} />;
+  if (active === "Activities") return <ActivitiesPanel data={data} onCheckIn={onCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} />;
   if (active === "Profile") return <ProfilePanel data={data} />;
   if (active === "Attendance") return <AttendancePanel data={data} />;
   if (active === "Time Logs") return <TimeLogsPanel data={data} />;
@@ -1124,10 +1138,14 @@ function DashboardPageInner() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
+  const [role, setRole] = useState("");
+  const isAdmin = ADMIN_ROLES.includes(role);
   // Tracks whether the active work-tab has been set (by URL param, the initial
   // load, or a manual click) — once true, later overview reloads must never
   // silently override a tab the user has already picked.
   const workTabInitialized = useRef(false);
+
+  useEffect(() => { api.me().then(m => setRole(m.role)).catch(() => {}); }, []);
 
   useEffect(() => {
     api.dashboardOverview()
@@ -1192,14 +1210,14 @@ function DashboardPageInner() {
 
         <main className={cn("-mt-5 flex flex-col gap-2 px-4 pb-6 lg:px-10", mainTab === "overview" && "lg:flex-row")}>
           {mainTab === "overview" && overview && (
-            <ProfileCard data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} />
+            <ProfileCard data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} />
           )}
           <div className="min-w-0 flex-1 space-y-2">
             {mainTab === "overview" && (
               overview ? (
                 <>
                   <WorkTabs tabs={overview.tabs.length ? overview.tabs : workTabs} active={workTab} setActive={selectWorkTab} />
-                  <ActivePanel active={workTab} data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} />
+                  <ActivePanel active={workTab} data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} />
                   {overviewError && <p className="text-xs text-red-500">{overviewError}</p>}
                 </>
               ) : (
@@ -1213,14 +1231,6 @@ function DashboardPageInner() {
           </div>
         </main>
       </div>
-
-      <footer className="fixed bottom-0 left-0 right-0 hidden h-6 border-t border-slate-200 bg-white text-[10px] text-slate-500 lg:flex">
-        <div className="w-28 border-r border-slate-200 text-center">Chats</div>
-        <div className="w-28 border-r border-slate-200 text-center">Contacts</div>
-        <div className="flex-1 px-3">Here is your Smart Chat (Ctrl+Space)</div>
-        <Moon className="mr-3 mt-1 h-3 w-3" />
-        <Filter className="mr-3 mt-1 h-3 w-3" />
-      </footer>
     </div>
   );
 }

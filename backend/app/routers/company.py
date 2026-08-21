@@ -15,7 +15,9 @@ from ..schemas import CompanyUpdateIn, CompanyOut
 from .deps import current_user
 
 router = APIRouter(prefix="/api/company", tags=["company"])
-UPLOAD_DIR = Path(tempfile.gettempdir()) / "hrms_uploads"
+# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
+# Windows/antivirus and silently loses uploaded files, which happened in prod.
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 LOGO_MAX_BYTES = 500 * 1024
 LOGO_WIDTH = 80
