@@ -44,7 +44,7 @@ OVERVIEW_TABS = [
 def _display_name(user: User, employee: Employee | None) -> str:
     if employee:
         return employee.display_name or f"{employee.first_name} {employee.last_name}".strip()
-    return user.email.split("@")[0]
+    return user.email.split("@")[0].replace(".", " ").replace("_", " ").title()
 
 def _shift_display(shift: Shift | None) -> OverviewShift:
     name = shift.name if shift else "General"
@@ -112,8 +112,10 @@ def _overview_payload(db: Session, user: User) -> DashboardOverview:
     week_start, week_end, week = _week_rows(today)
     shift_info = _shift_display(shift)
     name = _display_name(user, employee)
-    employee_code = employee.emp_code if employee else "Admin"
     role = designation.title if designation else user.role.replace("_", " ").title()
+    # Admin logins have no employee code of their own — show their role instead
+    # of a bare "Admin" label so the profile card doesn't read "Admin - admin".
+    employee_code = employee.emp_code if employee else role
     checked_in_at = log.check_in_at.strftime("%I:%M %p") if log else None
     checked_out_at = log.check_out_at.strftime("%I:%M %p") if log and log.check_out_at else None
     if not log:

@@ -713,15 +713,18 @@ function CalendarPanel() {
           <div className="grid grid-cols-7">
             {cells.map((c) => {
               const isToday = c.key === todayKey;
+              const isPast = c.key < todayKey;
               const dayMeetings = meetingsByDate[c.key] || [];
               const holiday = holidaysByDate[c.key];
               return (
                 <button
                   type="button"
                   key={c.key}
-                  onClick={() => setCreateDate(c.key)}
+                  onClick={() => { if (!isPast) setCreateDate(c.key); }}
+                  title={isPast ? "Can't schedule a meeting on a past date" : undefined}
                   className={cn(
-                    "min-h-24 border-b border-r border-slate-100 bg-white p-2 text-xs last:border-r-0 text-left hover:bg-slate-50 transition",
+                    "min-h-24 border-b border-r border-slate-100 bg-white p-2 text-xs last:border-r-0 text-left transition",
+                    isPast ? "cursor-not-allowed opacity-60" : "hover:bg-slate-50",
                     c.weekend && "bg-orange-50/60",
                     c.muted && "bg-slate-50 text-slate-400"
                   )}

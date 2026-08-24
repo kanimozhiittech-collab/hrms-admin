@@ -21,6 +21,26 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+/** Fetches an authenticated endpoint that returns a file and triggers a
+ * browser download — plain <a href> links can't carry the Authorization
+ * header, so they hit these protected endpoints as an anonymous request. */
+async function downloadFile(path: string, filename: string): Promise<void> {
+  const token = tokenStore.get();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { headers });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = await res.json(); msg = j.detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<{ access_token: string }>("/api/auth/login", {
@@ -158,8 +178,8 @@ export const api = {
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") q.set(k, String(v)); });
     return request<any[]>(`/api/attendance?${q.toString()}`);
   },
-  attendanceReportUrl: (month: number, year: number) =>
-    `${BASE}/api/attendance/report?month=${month}&year=${year}`,
+  downloadAttendanceReport: (month: number, year: number) =>
+    downloadFile(`/api/attendance/report?month=${month}&year=${year}`, `attendance-${year}-${String(month).padStart(2, "0")}.csv`),
   createRegularization: (data: any) =>
     request<any>("/api/attendance/regularize", { method: "POST", body: JSON.stringify(data) }),
   listRegularizations: (scope = "my") =>

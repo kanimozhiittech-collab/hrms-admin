@@ -25,27 +25,27 @@ const schema = z.object({
   middle_name: z.string().optional().or(z.literal("")),
   last_name: z.string().min(1, "Required"),
   display_name: z.string().optional().or(z.literal("")),
-  gender: z.string().optional().or(z.literal("")),
-  date_of_birth: z.string().optional().or(z.literal("")),
-  blood_group: z.string().optional().or(z.literal("")),
-  marital_status: z.string().optional().or(z.literal("")),
-  nationality: z.string().optional().or(z.literal("")),
+  gender: z.string().min(1, "Required"),
+  date_of_birth: z.string().min(1, "Required"),
+  blood_group: z.string().min(1, "Required"),
+  marital_status: z.string().min(1, "Required"),
+  nationality: z.string().min(1, "Required"),
   photo_url: z.string().optional().or(z.literal("")),
   // Contact
   work_email: z.string().email("Invalid email"),
   personal_email: z.string().email().optional().or(z.literal("")),
-  mobile: z.string().optional().or(z.literal("")),
+  mobile: z.string().min(1, "Required"),
   alt_phone: z.string().optional().or(z.literal("")),
   password: z.string().min(6, "At least 6 characters").optional().or(z.literal("")),
   // Job
-  department_id: z.string().optional().or(z.literal("")),
-  designation_id: z.string().optional().or(z.literal("")),
+  department_id: z.string().min(1, "Required"),
+  designation_id: z.string().min(1, "Required"),
   employee_type: z.string(),
-  date_of_joining: z.string().optional().or(z.literal("")),
+  date_of_joining: z.string().min(1, "Required"),
   probation_end_date: z.string().optional().or(z.literal("")),
   confirmation_date: z.string().optional().or(z.literal("")),
   reporting_manager_id: z.string().optional().or(z.literal("")),
-  work_location_id: z.string().optional().or(z.literal("")),
+  work_location_id: z.string().min(1, "Required"),
   shift_id: z.string().optional().or(z.literal("")),
   source_of_hire: z.string().optional().or(z.literal("")),
   tags: z.string().optional().or(z.literal("")),
@@ -72,12 +72,12 @@ const schema = z.object({
   // Nested
   addresses: z.array(z.object({
     address_type: z.enum(["Present","Permanent"]),
-    line1: z.string().optional().or(z.literal("")),
+    line1: z.string().min(1, "Required"),
     line2: z.string().optional().or(z.literal("")),
-    city: z.string().optional().or(z.literal("")),
-    state: z.string().optional().or(z.literal("")),
-    country: z.string().optional().or(z.literal("")),
-    pincode: z.string().optional().or(z.literal("")),
+    city: z.string().min(1, "Required"),
+    state: z.string().min(1, "Required"),
+    country: z.string().min(1, "Required"),
+    pincode: z.string().min(1, "Required"),
   })),
   education: z.array(z.object({
     id: z.string().optional().or(z.literal("")),
@@ -116,6 +116,28 @@ const schema = z.object({
 });
 
 export type EmployeeFormValues = z.infer<typeof schema>;
+
+const NATIONALITIES = [
+  "Afghan","Albanian","Algerian","American","Andorran","Angolan","Argentine","Armenian","Australian","Austrian",
+  "Azerbaijani","Bahamian","Bahraini","Bangladeshi","Barbadian","Belarusian","Belgian","Belizean","Beninese","Bhutanese",
+  "Bolivian","Bosnian","Botswanan","Brazilian","British","Bruneian","Bulgarian","Burkinabe","Burmese","Burundian",
+  "Cambodian","Cameroonian","Canadian","Cape Verdean","Central African","Chadian","Chilean","Chinese","Colombian","Comoran",
+  "Congolese","Costa Rican","Croatian","Cuban","Cypriot","Czech","Danish","Djiboutian","Dominican","Dutch",
+  "East Timorese","Ecuadorian","Egyptian","Emirati","English","Equatorial Guinean","Eritrean","Estonian","Ethiopian","Fijian",
+  "Filipino","Finnish","French","Gabonese","Gambian","Georgian","German","Ghanaian","Greek","Grenadian",
+  "Guatemalan","Guinean","Guyanese","Haitian","Honduran","Hungarian","Icelandic","Indian","Indonesian","Iranian",
+  "Iraqi","Irish","Israeli","Italian","Ivorian","Jamaican","Japanese","Jordanian","Kazakhstani","Kenyan",
+  "Kittitian","Kuwaiti","Kyrgyz","Laotian","Latvian","Lebanese","Liberian","Libyan","Liechtensteiner","Lithuanian",
+  "Luxembourgish","Macedonian","Malagasy","Malawian","Malaysian","Maldivian","Malian","Maltese","Marshallese","Mauritanian",
+  "Mauritian","Mexican","Micronesian","Moldovan","Monacan","Mongolian","Montenegrin","Moroccan","Mozambican","Namibian",
+  "Nauruan","Nepalese","New Zealander","Nicaraguan","Nigerian","Nigerien","North Korean","Norwegian","Omani","Pakistani",
+  "Palauan","Palestinian","Panamanian","Papua New Guinean","Paraguayan","Peruvian","Polish","Portuguese","Qatari","Romanian",
+  "Russian","Rwandan","Salvadoran","Samoan","San Marinese","Sao Tomean","Saudi Arabian","Scottish","Senegalese","Serbian",
+  "Seychellois","Sierra Leonean","Singaporean","Slovak","Slovenian","Solomon Islander","Somali","South African","South Korean","South Sudanese",
+  "Spanish","Sri Lankan","Sudanese","Surinamese","Swazi","Swedish","Swiss","Syrian","Taiwanese","Tajik",
+  "Tanzanian","Thai","Togolese","Tongan","Trinidadian","Tunisian","Turkish","Turkmen","Tuvaluan","Ugandan",
+  "Ukrainian","Uruguayan","Uzbek","Vanuatuan","Venezuelan","Vietnamese","Welsh","Yemeni","Zambian","Zimbabwean",
+] as const;
 
 export const EMPLOYEE_FORM_DEFAULTS: EmployeeFormValues = {
   emp_code: "", first_name: "", last_name: "", work_email: "", password: "",
@@ -180,10 +202,10 @@ function Field({ label, error, children }: any) {
   );
 }
 
-function TextField({ name, label, type = "text", placeholder, disabled }: any) {
+function TextField({ name, label, type = "text", placeholder, disabled, min, max }: any) {
   const { register, formState: { errors } } = useFormContext();
   const err = (errors as any)[name]?.message;
-  return <Field label={label} error={err}><Input type={type} placeholder={placeholder} disabled={disabled} {...register(name)}/></Field>;
+  return <Field label={label} error={err}><Input type={type} placeholder={placeholder} disabled={disabled} min={min} max={max} {...register(name)}/></Field>;
 }
 
 function SelectField({ name, label, children }: any) {
@@ -288,6 +310,7 @@ export function EmployeeForm({
   const [expFiles, setExpFiles] = useState<Record<number, File>>({});
   const [sameAsPresent, setSameAsPresent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
@@ -449,24 +472,26 @@ export function EmployeeForm({
                     <TextField name="middle_name" label="Middle Name"/>
                     <TextField name="last_name" label="Last Name *"/>
                     <TextField name="display_name" label="Display Name"/>
-                    <SelectField name="gender" label="Gender">
+                    <SelectField name="gender" label="Gender *">
                       <option value="">—</option><option>Male</option><option>Female</option><option>Other</option>
                     </SelectField>
-                    <TextField name="date_of_birth" label="Date of Birth" type="date"/>
-                    <SelectField name="blood_group" label="Blood Group">
+                    <TextField name="date_of_birth" label="Date of Birth *" type="date" min="1900-01-01" max={todayStr}/>
+                    <SelectField name="blood_group" label="Blood Group *">
                       <option value="">—</option>{["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(b=> <option key={b}>{b}</option>)}
                     </SelectField>
-                    <SelectField name="marital_status" label="Marital Status">
+                    <SelectField name="marital_status" label="Marital Status *">
                       <option value="">—</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
                     </SelectField>
-                    <TextField name="nationality" label="Nationality" placeholder="Indian"/>
+                    <SelectField name="nationality" label="Nationality *">
+                      <option value="">—</option>{NATIONALITIES.map(n => <option key={n}>{n}</option>)}
+                    </SelectField>
                   </div>
 
                   <SectionHeader>Contact Details</SectionHeader>
                   <div className="grid md:grid-cols-2 gap-4">
                     <TextField name="work_email" label="Work Email *" type="email"/>
                     <TextField name="personal_email" label="Personal Email" type="email"/>
-                    <TextField name="mobile" label="Mobile" placeholder="+91 …"/>
+                    <TextField name="mobile" label="Mobile *" placeholder="+91 …"/>
                     <TextField name="alt_phone" label="Alternate Phone"/>
                     <div>
                       <PasswordField
@@ -507,13 +532,13 @@ export function EmployeeForm({
                             </label>
                           )}
                         </div>
-                        <TextField name={`addresses.${i}.line1`} label="Address Line 1" disabled={i===1 && sameAsPresent}/>
+                        <TextField name={`addresses.${i}.line1`} label="Address Line 1 *" disabled={i===1 && sameAsPresent}/>
                         <TextField name={`addresses.${i}.line2`} label="Address Line 2" disabled={i===1 && sameAsPresent}/>
                         <div className="grid grid-cols-2 gap-3">
-                          <TextField name={`addresses.${i}.city`} label="City" disabled={i===1 && sameAsPresent}/>
-                          <TextField name={`addresses.${i}.state`} label="State" disabled={i===1 && sameAsPresent}/>
-                          <TextField name={`addresses.${i}.country`} label="Country" disabled={i===1 && sameAsPresent}/>
-                          <TextField name={`addresses.${i}.pincode`} label="Pincode" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.city`} label="City *" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.state`} label="State *" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.country`} label="Country *" disabled={i===1 && sameAsPresent}/>
+                          <TextField name={`addresses.${i}.pincode`} label="Pincode *" disabled={i===1 && sameAsPresent}/>
                         </div>
                       </div>
                     ))}
@@ -556,25 +581,25 @@ export function EmployeeForm({
                 <TabsContent value="job">
                   <SectionHeader first>Job Details</SectionHeader>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <SelectField name="department_id" label="Department">
+                    <SelectField name="department_id" label="Department *">
                       <option value="">—</option>
                       {meta.depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </SelectField>
-                    <SelectField name="designation_id" label="Designation">
+                    <SelectField name="designation_id" label="Designation *">
                       <option value="">—</option>
                       {meta.desigs.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
                     </SelectField>
                     <SelectField name="employee_type" label="Employee Type">
                       {["Permanent","Contract","Intern","Trainee","Consultant","Freelancer"].map(t=> <option key={t}>{t}</option>)}
                     </SelectField>
-                    <TextField name="date_of_joining" label="Date of Joining" type="date"/>
+                    <TextField name="date_of_joining" label="Date of Joining *" type="date"/>
                     <TextField name="probation_end_date" label="Probation End" type="date"/>
                     <TextField name="confirmation_date" label="Confirmation Date" type="date"/>
                     <SelectField name="reporting_manager_id" label="Reporting Manager">
                       <option value="">—</option>
                       {meta.managers.filter(m => m.id !== employeeId).map(m => <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>)}
                     </SelectField>
-                    <SelectField name="work_location_id" label="Work Location">
+                    <SelectField name="work_location_id" label="Work Location *">
                       <option value="">—</option>{meta.locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </SelectField>
                     <SelectField name="shift_id" label="Shift">

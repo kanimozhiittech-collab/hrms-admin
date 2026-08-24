@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Download, Clock, CalendarClock, CheckCircle2, XCircle, Search } from "lucide-react";
+import { toast } from "sonner";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -217,9 +218,12 @@ export default function AttendancePage() {
                   {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                 </Select>
               </div>
-              <a href={api.attendanceReportUrl(month, year)} target="_blank" rel="noreferrer">
-                <Button variant="outline"><Download className="h-4 w-4" />Export Month CSV</Button>
-              </a>
+              <Button
+                variant="outline"
+                onClick={() => api.downloadAttendanceReport(month, year).catch((e: any) => toast.error(e.message))}
+              >
+                <Download className="h-4 w-4" />Export Month CSV
+              </Button>
             </div>
             <Card>
               <div className="overflow-x-auto">

@@ -352,6 +352,8 @@ def list_meetings(
 
 @meetings_router.post("", response_model=MeetingOut)
 def create_meeting(body: MeetingIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if body.meeting_date < date.today():
+        raise HTTPException(400, "Can't schedule a meeting on a past date")
     valid_participants = []
     if body.participant_ids:
         rows = db.query(Employee).filter(
