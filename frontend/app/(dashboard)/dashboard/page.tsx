@@ -215,6 +215,66 @@ function MoreMenu({ onRefresh, className, buttonClassName }: { onRefresh: () => 
   );
 }
 
+const WORKTABS_HIDDEN_KEY = "pp_hidden_worktabs";
+
+/** Lets you hide clutter from the long Activities/Feeds/.../Feedback tab
+ * strip — same portal trick as MoreMenu, for the same clipping reason. */
+function TabFilterMenu({ allTabs, hidden, onToggle }: { allTabs: string[]; hidden: Set<string>; onToggle: (tab: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen((o) => !o);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        title="Filter tabs"
+        aria-label="Filter tabs"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50"
+      >
+        <Settings2 className="h-4 w-4" />
+      </button>
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-50 max-h-80 w-52 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          <p className="px-3 py-1.5 text-xs font-medium text-slate-500">Show tabs</p>
+          {allTabs.map((tab) => (
+            <label key={tab} className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" checked={!hidden.has(tab)} onChange={() => onToggle(tab)} />
+              {tab}
+            </label>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <span className={cn("inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700", className)}>
@@ -298,13 +358,39 @@ function ProfileCard({
 }
 
 function WorkTabs({ tabs, active, setActive, onRefresh }: { tabs: string[]; active: string; setActive: (tab: string) => void; onRefresh: () => void }) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(WORKTABS_HIDDEN_KEY) || "[]");
+      setHidden(new Set(saved));
+    } catch {}
+  }, []);
+
+  function toggleTab(tab: string) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(tab)) next.delete(tab); else next.add(tab);
+      try { localStorage.setItem(WORKTABS_HIDDEN_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  const visibleTabs = tabs.filter((t) => !hidden.has(t));
+
+  // If the active tab was just hidden, fall back to the first tab still shown.
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.includes(active)) setActive(visibleTabs[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidden, tabs]);
+
   return (
     <ContentCard className="overflow-hidden">
       <div className="flex items-center">
-        {/* Only the tab list scrolls — the "…" / settings buttons stay pinned and
+        {/* Only the tab list scrolls — the "…" / filter buttons stay pinned and
          * always visible, instead of scrolling away with a long tab list. */}
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-hide px-4">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -320,9 +406,7 @@ function WorkTabs({ tabs, active, setActive, onRefresh }: { tabs: string[]; acti
         </div>
         <div className="flex shrink-0 items-center gap-1 pr-4">
           <MoreMenu onRefresh={onRefresh} buttonClassName="h-9 w-9 shadow-none"/>
-          <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50">
-            <Settings2 className="h-4 w-4" />
-          </button>
+          <TabFilterMenu allTabs={tabs} hidden={hidden} onToggle={toggleTab}/>
         </div>
       </div>
     </ContentCard>
