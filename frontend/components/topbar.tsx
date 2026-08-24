@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { tokenStore } from "@/lib/auth";
-import { Bell, ChevronDown, LogOut, Search, User } from "lucide-react";
+import { Bell, ChevronDown, LogOut, User } from "lucide-react";
 
 export function Topbar({ title }: { title: string }) {
   const router = useRouter();
@@ -29,11 +29,7 @@ export function Topbar({ title }: { title: string }) {
       <div className="h-14 px-4 lg:px-6 flex items-center gap-4">
         <h1 className="text-base font-semibold text-slate-900">{title}</h1>
         <div className="ml-auto flex items-center gap-3">
-          <div className="relative hidden md:block">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
-            <input placeholder="Search…" className="h-9 w-64 rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"/>
-          </div>
-          <button className="h-9 w-9 grid place-items-center rounded-md text-slate-600 hover:bg-slate-100"><Bell className="h-4 w-4"/></button>
+<button className="h-9 w-9 grid place-items-center rounded-md text-slate-600 hover:bg-slate-100"><Bell className="h-4 w-4"/></button>
           <div ref={menuRef} className="relative pl-3 border-l border-slate-200">
             <button
               onClick={() => setMenuOpen(o => !o)}
