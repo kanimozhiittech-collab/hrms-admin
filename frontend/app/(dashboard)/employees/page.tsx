@@ -12,7 +12,6 @@ import { api } from "@/lib/api";
 import { Plus, Search, Download, LayoutList, LayoutGrid } from "lucide-react";
 
 const STATUS_TONE: Record<string, any> = { Active: "green", "On Leave": "amber", Inactive: "slate", Resigned: "red" };
-const KANBAN_COLUMNS = ["Active", "On Leave", "Inactive", "Resigned", "Terminated"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -36,9 +35,7 @@ export default function EmployeesPage() {
   const pageSize = 10;
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [view, setView] = useState<"list" | "kanban">("list");
-  const [kanbanItems, setKanbanItems] = useState<any[]>([]);
-  const [kanbanLoading, setKanbanLoading] = useState(false);
+  const [view, setView] = useState<"list" | "grid">("list");
 
   useEffect(() => {
     api.me().then(m => {
@@ -55,26 +52,8 @@ export default function EmployeesPage() {
     } finally { setLoading(false); }
   }
 
-  /** Kanban groups by status, so it needs every matching employee, not one
-   * page — loop through the paginated API until we've collected them all. */
-  async function loadKanban() {
-    setKanbanLoading(true);
-    try {
-      const all: any[] = [];
-      let p = 1;
-      while (true) {
-        const res = await api.listEmployees({ q, department_id: dept, status, page: p, page_size: 100 });
-        all.push(...res.items);
-        if (all.length >= res.total || res.items.length === 0) break;
-        p += 1;
-      }
-      setKanbanItems(all);
-    } finally { setKanbanLoading(false); }
-  }
-
   useEffect(() => { if (allowed) api.departments().then(setDepts).catch(() => {}); }, [allowed]);
-  useEffect(() => { if (allowed && view === "list") load(); }, [allowed, view, q, dept, status, page]);
-  useEffect(() => { if (allowed && view === "kanban") loadKanban(); }, [allowed, view, q, dept, status]);
+  useEffect(() => { if (allowed) load(); }, [allowed, q, dept, status, page]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
 
@@ -120,10 +99,10 @@ export default function EmployeesPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setView("kanban")}
-                className={`h-9 px-3 grid place-items-center border-l border-slate-200 ${view === "kanban" ? "bg-brand-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
-                title="Kanban view"
-                aria-label="Kanban view"
+                onClick={() => setView("grid")}
+                className={`h-9 px-3 grid place-items-center border-l border-slate-200 ${view === "grid" ? "bg-brand-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                title="Grid view"
+                aria-label="Grid view"
               >
                 <LayoutGrid className="h-4 w-4"/>
               </button>
@@ -133,71 +112,55 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        {view === "kanban" ? (
+        {view === "grid" ? (
           <Card>
             <div className="p-4 flex flex-wrap gap-3 border-b border-slate-100">
               <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
-                <Input placeholder="Search by name, email, ID…" value={q} onChange={e=>setQ(e.target.value)} className="pl-8"/>
+                <Input placeholder="Search by name, email, ID…" value={q} onChange={e=>{setPage(1);setQ(e.target.value);}} className="pl-8"/>
               </div>
-              <Select value={dept} onChange={e=>setDept(e.target.value)} className="max-w-[200px]">
+              <Select value={dept} onChange={e=>{setPage(1);setDept(e.target.value);}} className="max-w-[200px]">
                 <option value="">All Departments</option>
                 {depts.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
               </Select>
-              <Select value={status} onChange={e=>setStatus(e.target.value)} className="max-w-[160px]">
+              <Select value={status} onChange={e=>{setPage(1);setStatus(e.target.value);}} className="max-w-[160px]">
                 <option value="">All Status</option>
                 <option>Active</option><option>On Leave</option><option>Inactive</option><option>Resigned</option>
               </Select>
             </div>
 
-            {kanbanLoading ? (
+            {loading ? (
               <div className="px-4 py-10 text-center text-slate-400 text-sm">Loading…</div>
-            ) : kanbanItems.length === 0 ? (
+            ) : data.items.length === 0 ? (
               <div className="px-4 py-10 text-center text-slate-400 text-sm">No employees match your filters.</div>
             ) : (
-              <div className="p-4 overflow-x-auto">
-                <div className="flex gap-4 min-w-max">
-                  {KANBAN_COLUMNS.filter(col => !status || col === status).map(col => {
-                    const colItems = kanbanItems.filter((e: any) => e.status === col);
-                    if (colItems.length === 0 && status && col !== status) return null;
-                    return (
-                      <div key={col} className="w-72 shrink-0">
-                        <div className="flex items-center justify-between mb-2 px-1">
-                          <div className="flex items-center gap-2">
-                            <Badge tone={STATUS_TONE[col] || "slate"}>{col}</Badge>
-                          </div>
-                          <span className="text-xs text-slate-400">{colItems.length}</span>
-                        </div>
-                        <div className="space-y-2 min-h-[40px] rounded-lg bg-slate-50 p-2">
-                          {colItems.length === 0 && (
-                            <div className="text-xs text-slate-300 text-center py-6">No employees</div>
-                          )}
-                          {colItems.map((e: any) => (
-                            <Link
-                              key={e.id}
-                              href={`/employees/${e.id}`}
-                              className="block bg-white rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:shadow-sm transition"
-                            >
-                              <div className="flex items-center gap-3">
-                                <EmployeeAvatar e={e} size="h-10 w-10 text-sm"/>
-                                <div className="min-w-0">
-                                  <div className="font-medium text-slate-900 truncate">{e.first_name} {e.last_name}</div>
-                                  <div className="text-xs text-slate-500 truncate">{e.designation || "—"}</div>
-                                </div>
-                              </div>
-                              <div className="mt-2 flex items-center justify-between">
-                                <span className="text-[11px] font-mono text-slate-400">{e.emp_code}</span>
-                                {e.department && <Badge tone="blue">{e.department}</Badge>}
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {data.items.map((e: any) => (
+                  <Link
+                    key={e.id}
+                    href={`/employees/${e.id}`}
+                    className="flex flex-col items-center text-center bg-white rounded-lg border border-slate-200 p-4 hover:border-brand-300 hover:shadow-sm transition"
+                  >
+                    <EmployeeAvatar e={e} size="h-16 w-16 text-lg"/>
+                    <div className="mt-3 font-medium text-slate-900 truncate w-full">{e.first_name} {e.last_name}</div>
+                    <div className="text-xs text-slate-500 truncate w-full">{e.designation || "—"}</div>
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap justify-center">
+                      <Badge tone={STATUS_TONE[e.status] || "slate"}>{e.status}</Badge>
+                      {e.department && <Badge tone="blue">{e.department}</Badge>}
+                    </div>
+                    <div className="mt-2 text-[11px] font-mono text-slate-400">{e.emp_code}</div>
+                  </Link>
+                ))}
               </div>
             )}
+
+            <div className="flex flex-col items-center gap-2 p-4 border-t border-slate-100">
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</Button>
+                <Button variant="outline" size="sm" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Next</Button>
+              </div>
+              <div className="text-xs text-slate-500">Page {page} of {totalPages}</div>
+            </div>
           </Card>
         ) : (
         <Card>
