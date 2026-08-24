@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Workflow(deep-research)",
+      "WebSearch",
+      "WebFetch(domain:help.zoho.com)",
+      "WebFetch(domain:www.zoho.com)",
+      "WebFetch(domain:www.odoo.com)",
+      "WebFetch(domain:www.braincuber.com)",
+      "WebFetch(domain:www.softwaresuggest.com)",
+      "WebFetch(domain:www.petpooja.com)",
+      "WebFetch(domain:blog.petpooja.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:play.google.com)",
+      "Bash(gh api *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(./venv/Scripts/python.exe *)",
+      "Bash(cat)",
+      "Bash(cp /tmp/smoke_test.py /c/Users/xmedia/Documents/hrms-app/backend/_smoke_test.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(\"C:\\\\Users\\\\xmedia\\\\Documents\\\\hrms-app\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -c \"import psycopg; print\\(psycopg.__version__\\); print\\(psycopg.pq.__build_version__\\)\")",
+      "Bash(curl *)",
+      "Bash(timeout 15 npx --yes vercel login --github)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(pkill -f \"npx\")",
+      "Bash(\"C:\\\\Users\\\\xmedia\\\\Documents\\\\hrms-app\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -c \"import bcrypt; print\\(bcrypt.__version__\\)\")",
+      "Bash('C:\\\\Users\\\\xmedia\\\\Documents\\\\hrms-app\\\\backend\\\\venv\\\\Scripts\\\\python.exe' -c ' *)",
+      "Bash(\"C:\\\\Users\\\\xmedia\\\\Documents\\\\hrms-app\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m venv testenv --clear)",
+      "Bash(\"testenv\\\\Scripts\\\\python.exe\" -m pip install --quiet \"passlib[bcrypt]==1.7.4\" \"bcrypt==5.0.0\")",
+      "Bash('testenv\\\\Scripts\\\\python.exe' -c ' *)",
+      "Bash(rm -rf \"C:\\\\Users\\\\xmedia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-xmedia-Documents-hrms-app\\\\7450915b-e535-4239-878a-35c66c948800\\\\scratchpad\\\\testenv\")",
+      "Bash(rm -rf .vercel)",
+      "Bash(timeout 30 npx --yes vercel link --yes --project hrms-admin-1ra6)",
+      "Bash(timeout 20 npx --yes vercel ls)",
+      "Bash(timeout 180 npx --yes vercel --prod --yes)",
+      "Bash(timeout 45 npx --yes vercel logs https://hrms-admin-1ra6-pseocxwc5-kanimozhi-s-projects1.vercel.app)"
+    ]
+  }
+}
