@@ -4,13 +4,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { tokenStore } from "@/lib/auth";
-import { Bell, ChevronDown, LogOut, User } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, User } from "lucide-react";
+import { useSidebar } from "@/lib/sidebar-context";
 
 export function Topbar({ title }: { title: string }) {
   const router = useRouter();
   const [me, setMe] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { setMobileOpen } = useSidebar();
 
   useEffect(() => { api.me().then(setMe).catch(() => { tokenStore.clear(); router.replace("/login"); }); }, []);
 
@@ -27,6 +29,15 @@ export function Topbar({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-10 bg-white border-b border-slate-200">
       <div className="h-14 px-4 lg:px-6 flex items-center gap-4">
+        {/* Hamburger — mobile only */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="grid h-9 w-9 place-items-center rounded-md text-slate-600 hover:bg-slate-100 md:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5"/>
+        </button>
         <h1 className="text-base font-semibold text-slate-900">{title}</h1>
         <div className="ml-auto flex items-center gap-3">
 <button className="h-9 w-9 grid place-items-center rounded-md text-slate-600 hover:bg-slate-100"><Bell className="h-4 w-4"/></button>

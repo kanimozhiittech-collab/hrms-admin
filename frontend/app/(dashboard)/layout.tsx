@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { tokenStore } from "@/lib/auth";
+import { SidebarProvider } from "@/lib/sidebar-context";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,9 +14,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router]);
   if (!ready) return null;
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar/>
-      <div className="flex-1 min-w-0 flex flex-col">{children}</div>
-    </div>
+    <SidebarProvider>
+      <div className="flex min-h-screen bg-slate-50">
+        <Sidebar/>
+        <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      </div>
+    </SidebarProvider>
   );
 }

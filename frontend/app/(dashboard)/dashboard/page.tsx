@@ -22,6 +22,7 @@ import {
   LogOut,
   Mail,
   Megaphone,
+  Menu,
   MoreHorizontal,
   Phone,
   Plus,
@@ -32,6 +33,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
+import { useSidebar } from "@/lib/sidebar-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal, ModalField } from "@/components/ui/modal";
@@ -269,7 +271,7 @@ function ActivitiesPanel({
     <div className="space-y-2">
       <ContentCard className="relative flex min-h-20 items-center gap-4 overflow-hidden p-4">
         <div className="grid h-14 w-20 place-items-center rounded border border-slate-200 bg-white text-xs font-semibold text-slate-700">
-          <span className="text-blue-600">Zoho</span>
+          <span className="text-blue-600">Nygrow</span>
           People
         </div>
         <div>
@@ -1135,6 +1137,7 @@ function DashboardPageInner() {
   const requestedTab = searchParams.get("tab");
   const [mainTab, setMainTab] = useState("overview");
   const [workTab, setWorkTab] = useState(requestedTab || "Activities");
+  const { setMobileOpen } = useSidebar();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
@@ -1179,20 +1182,31 @@ function DashboardPageInner() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
-      <div className="flex h-9 items-end gap-5 border-b border-slate-200 bg-white px-4">
-        {mainTabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setMainTab(tab)}
-            className={cn(
-              "h-full border-b-2 border-transparent px-1 text-xs font-medium capitalize text-slate-900",
-              mainTab === tab && "border-blue-500"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="flex h-12 items-center gap-1 border-b border-slate-200 bg-white px-3 sm:px-4">
+        {/* Hamburger — mobile only */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 md:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5"/>
+        </button>
+        <div className="flex h-full items-end gap-3 overflow-x-auto">
+          {mainTabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setMainTab(tab)}
+              className={cn(
+                "h-full shrink-0 border-b-2 border-transparent pb-0 px-1 text-xs font-medium capitalize text-slate-900",
+                mainTab === tab && "border-blue-500"
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
         <HeaderProfileMenu/>
       </div>
 
