@@ -35,6 +35,7 @@ class OverviewProfile(BaseModel):
     employee_code: str
     name: str
     email: str
+    photo_url: Optional[str] = None
     status_text: str
     timer: List[str]
     can_check_in: bool

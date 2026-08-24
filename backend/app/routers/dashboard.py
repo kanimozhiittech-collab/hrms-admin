@@ -140,6 +140,7 @@ def _overview_payload(db: Session, user: User) -> DashboardOverview:
             employee_code=employee_code,
             name=name,
             email=user.email,
+            photo_url=employee.photo_url if employee else None,
             status_text=status_text,
             timer=_timer_from_log(log, now),
             can_check_in=can_check_in,

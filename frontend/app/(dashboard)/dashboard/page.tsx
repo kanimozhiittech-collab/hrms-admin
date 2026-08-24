@@ -69,6 +69,7 @@ type OverviewData = {
     employee_code: string;
     name: string;
     email: string;
+    photo_url?: string | null;
     status_text: string;
     timer: string[];
     can_check_in: boolean;
@@ -327,7 +328,12 @@ function ProfileCard({
   return (
     <aside className="relative z-10 w-full shrink-0 rounded-md border border-slate-200 bg-white px-4 pb-4 pt-0 text-center shadow-sm lg:w-56">
       <div className="mx-auto -mt-12 grid h-20 w-20 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-        <CircleUserRound className="h-16 w-16 text-slate-300" />
+        {data.profile.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`${API_BASE}${data.profile.photo_url}`} alt={data.profile.name} className="h-full w-full object-cover"/>
+        ) : (
+          <CircleUserRound className="h-16 w-16 text-slate-300" />
+        )}
       </div>
       <p className="mt-3 text-sm font-semibold text-slate-900">
         {data.profile.employee_code} - {data.profile.name}
@@ -1376,8 +1382,11 @@ function DashboardPageInner() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState("");
   const [checkingIn, setCheckingIn] = useState(false);
-  const [role, setRole] = useState("");
-  const isAdmin = ADMIN_ROLES.includes(role);
+  // null = role not resolved yet. Treated the same as "admin" (hides the
+  // check-in button) until we actually know — otherwise the button briefly
+  // flashes in for admin logins and then disappears once /me resolves.
+  const [role, setRole] = useState<string | null>(null);
+  const isAdmin = role === null || ADMIN_ROLES.includes(role);
   // Tracks whether the active work-tab has been set (by URL param, the initial
   // load, or a manual click) — once true, later overview reloads must never
   // silently override a tab the user has already picked.
