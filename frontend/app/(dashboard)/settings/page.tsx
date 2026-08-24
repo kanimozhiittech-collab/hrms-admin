@@ -28,7 +28,7 @@ const SERVICES = [
   { key: "leave-tracker", label: "Leave Tracker", icon: CalendarDays, status: "ready" as const },
   { key: "shifts", label: "Shifts", icon: Clock, status: "ready" as const },
   { key: "files", label: "Files", icon: FileText, status: "ready" as const },
-  { key: "employee-info", label: "Employee Information", icon: Building2, status: "ready" as const },
+  { key: "employee-info", label: "Organization Setup", icon: Building2, status: "ready" as const },
   { key: "hr-letters", label: "HR Letters", icon: Mail, status: "ready" as const },
   { key: "tasks", label: "Tasks", icon: ListChecks, status: "ready" as const },
   { key: "general", label: "General", icon: Settings2, status: "ready" as const },

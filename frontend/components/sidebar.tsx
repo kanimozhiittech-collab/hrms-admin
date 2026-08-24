@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useSidebar } from "@/lib/sidebar-context";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const baseNav = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -26,9 +27,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isHR, setIsHR] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [company, setCompany] = useState<{ name?: string; logo_url?: string } | null>(null);
   const { mobileOpen, setMobileOpen } = useSidebar();
 
   useEffect(() => { api.me().then(m => setIsHR(HR_ROLES.includes(m.role))).catch(() => {}); }, []);
+  useEffect(() => { api.getCompany().then(setCompany).catch(() => {}); }, []);
   useEffect(() => {
     setCollapsed(localStorage.getItem("pp_sidebar_collapsed") === "1");
   }, []);
@@ -43,8 +46,9 @@ export function Sidebar() {
     });
   }
 
+  const settingsNav = { href: "/settings", label: "Settings", icon: Settings };
   const nav = isHR
-    ? [baseNav[0], hrNav, ...baseNav.slice(1)]
+    ? [baseNav[0], hrNav, ...baseNav.slice(1), settingsNav]
     : baseNav;
 
   const sidebarContent = (
@@ -56,9 +60,14 @@ export function Sidebar() {
       "w-64"
     )}>
       <div className={cn("py-5 flex items-center gap-2 border-b border-white/10", collapsed ? "md:px-3 md:justify-center px-5" : "px-5")}>
-        <div className="h-9 w-9 shrink-0 rounded-lg bg-brand-600 grid place-items-center"><Building2 className="h-5 w-5"/></div>
+        {company?.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`${API_URL}${company.logo_url}`} alt={company.name || "Logo"} className="h-9 w-9 shrink-0 rounded-lg object-cover"/>
+        ) : (
+          <div className="h-9 w-9 shrink-0 rounded-lg bg-brand-600 grid place-items-center"><Building2 className="h-5 w-5"/></div>
+        )}
         <div className={cn(collapsed && "md:hidden")}>
-          <div className="text-sm font-semibold">HRMS</div>
+          <div className="text-sm font-semibold truncate max-w-[140px]">{company?.name || "HRMS"}</div>
           <div className="text-[11px] text-slate-400">HRMS Suite</div>
         </div>
         {/* Close button — mobile only */}
@@ -105,18 +114,6 @@ export function Sidebar() {
           </div>
         </div>
       </nav>
-
-      {isHR && (
-        <div className="p-3 border-t border-white/10">
-          <Link href="/settings" title={collapsed ? "Settings" : undefined}
-            className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm",
-              collapsed && "md:justify-center md:px-0",
-              pathname.startsWith("/settings") ? "bg-brand-600 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white")}>
-            <Settings className="h-4 w-4 shrink-0"/>
-            <span className={cn(collapsed && "md:hidden")}>Settings</span>
-          </Link>
-        </div>
-      )}
 
       {/* Collapse toggle — desktop only */}
       <button
