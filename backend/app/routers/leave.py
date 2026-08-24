@@ -312,6 +312,9 @@ def apply_leave(
     if payload.from_date > payload.to_date:
         raise HTTPException(status_code=400, detail="From date must be on or before To date")
 
+    if payload.from_date < date.today():
+        raise HTTPException(status_code=400, detail="Can't apply for leave starting in the past")
+
     if payload.half_day and payload.from_date != payload.to_date:
         raise HTTPException(status_code=400, detail="Half-day leave must be a single day")
 

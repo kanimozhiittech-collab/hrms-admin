@@ -321,11 +321,11 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">From</label>
-              <Input type="date" value={form.from_date} onChange={e => setForm({ ...form, from_date: e.target.value, to_date: form.half_day ? e.target.value : form.to_date })} required />
+              <Input type="date" min={today} value={form.from_date} onChange={e => setForm({ ...form, from_date: e.target.value, to_date: form.half_day ? e.target.value : form.to_date })} required />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600">To</label>
-              <Input type="date" value={form.to_date} disabled={form.half_day} onChange={e => setForm({ ...form, to_date: e.target.value })} required />
+              <Input type="date" min={form.from_date || today} value={form.to_date} disabled={form.half_day} onChange={e => setForm({ ...form, to_date: e.target.value })} required />
             </div>
           </div>
           <div className="flex items-center gap-2">

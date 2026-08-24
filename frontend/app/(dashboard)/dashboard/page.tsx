@@ -300,7 +300,7 @@ function ProfileCard({
 function WorkTabs({ tabs, active, setActive, onRefresh }: { tabs: string[]; active: string; setActive: (tab: string) => void; onRefresh: () => void }) {
   return (
     <ContentCard className="overflow-hidden">
-      <div className="flex items-center gap-1 overflow-x-auto px-4">
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-4">
         {tabs.map((tab) => (
           <button
             key={tab}
