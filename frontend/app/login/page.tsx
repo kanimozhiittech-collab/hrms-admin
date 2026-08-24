@@ -6,7 +6,7 @@ import { tokenStore } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -32,7 +32,10 @@ export default function LoginPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-brand-700 to-brand-950 text-white p-12">
         <div className="flex items-center gap-2">
-          <div className="h-10 w-10 rounded-xl bg-white/10 grid place-items-center"><Building2 className="h-6 w-6"/></div>
+          <div className="h-10 w-10 rounded-xl bg-white grid place-items-center p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Logo" className="h-full w-full object-contain"/>
+          </div>
           <span className="text-xl font-semibold">HRMS</span>
         </div>
         <div>

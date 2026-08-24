@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Building2, LayoutDashboard, Users, Clock, CalendarDays, Wallet, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, LifeBuoy, X } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarDays, Wallet, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, LifeBuoy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useSidebar } from "@/lib/sidebar-context";
@@ -64,7 +64,8 @@ export function Sidebar() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={`${API_URL}${company.logo_url}`} alt={company.name || "Logo"} className="h-9 w-9 shrink-0 rounded-lg object-cover"/>
         ) : (
-          <div className="h-9 w-9 shrink-0 rounded-lg bg-brand-600 grid place-items-center"><Building2 className="h-5 w-5"/></div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/logo.png" alt="Logo" className="h-9 w-9 shrink-0 rounded-lg object-contain"/>
         )}
         <div className={cn(collapsed && "md:hidden")}>
           <div className="text-sm font-semibold truncate max-w-[140px]">{company?.name || "HRMS"}</div>
