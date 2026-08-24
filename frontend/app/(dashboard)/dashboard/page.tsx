@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tokenStore } from "@/lib/auth";
@@ -147,19 +148,34 @@ const announcements = [
 ];
 
 /** The "…" menus scattered around Home currently only expose one useful,
- * always-safe action — re-fetching whatever data the page is showing. */
+ * always-safe action — re-fetching whatever data the page is showing.
+ * Rendered through a portal because some of these buttons live inside a
+ * horizontally-scrolling, overflow-hidden tab strip — an in-place absolutely
+ * positioned dropdown would get silently clipped and never actually show. */
 function MoreMenu({ onRefresh, className, buttonClassName }: { onRefresh: () => void; className?: string; buttonClassName?: string }) {
   const [open, setOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  function toggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen((o) => !o);
+  }
 
   async function refresh() {
     setRefreshing(true);
@@ -167,17 +183,22 @@ function MoreMenu({ onRefresh, className, buttonClassName }: { onRefresh: () => 
   }
 
   return (
-    <div ref={ref} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         aria-label="More options"
         className={cn("grid h-8 w-8 place-items-center rounded bg-white text-slate-700 shadow hover:bg-slate-50", buttonClassName)}
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+        >
           <button
             type="button"
             onClick={refresh}
@@ -187,7 +208,8 @@ function MoreMenu({ onRefresh, className, buttonClassName }: { onRefresh: () => 
             <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
