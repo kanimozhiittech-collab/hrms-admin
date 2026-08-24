@@ -71,6 +71,9 @@ class EmployeeIn(BaseModel):
     personal_email: Optional[EmailStr] = None
     mobile: Optional[str] = None
     alt_phone: Optional[str] = None
+    # Login — used to set/reset this employee's login password; never persisted
+    # on the Employee row itself and never echoed back in responses.
+    password: Optional[str] = None
     # Job
     department_id: Optional[str] = None
     designation_id: Optional[str] = None

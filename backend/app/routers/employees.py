@@ -176,7 +176,7 @@ def create_employee(body: EmployeeIn, db: Session = Depends(get_db), user: User 
         company = db.query(Company).filter(Company.id == user.company_id).first()
         emp_code = _generate_emp_code(db, user.company_id, company.name if company else "")
 
-    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code"})
+    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code", "password"})
     e = Employee(company_id=user.company_id, emp_code=emp_code, **data)
     for a in body.addresses: e.addresses.append(EmployeeAddress(**a.model_dump()))
     edu_rows = [EducationRecord(**x.model_dump(exclude={"id"})) for x in body.education]
@@ -194,7 +194,7 @@ def create_employee(body: EmployeeIn, db: Session = Depends(get_db), user: User 
             db.add(User(
                 company_id=user.company_id,
                 email=e.work_email,
-                password_hash=hash_password(DEFAULT_EMPLOYEE_PASSWORD),
+                password_hash=hash_password(body.password or DEFAULT_EMPLOYEE_PASSWORD),
                 role="employee",
                 employee_id=e.id,
                 is_active=e.status not in BLOCKING_STATUSES,
@@ -220,7 +220,7 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
         raise HTTPException(403, "This employee is outside your assigned department")
     if scope and body.department_id != scope:
         raise HTTPException(403, "You can only assign employees to your own department")
-    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code"})
+    data = body.model_dump(exclude={"addresses", "education", "experience", "dependents", "emergency_contacts", "emp_code", "password"})
     for k, v in data.items(): setattr(e, k, v)
     if body.emp_code:
         e.emp_code = body.emp_code
@@ -239,6 +239,8 @@ def update_employee(emp_id: str, body: EmployeeIn, db: Session = Depends(get_db)
     # account, plus any manually linked from Manage Accounts) — sync all of them.
     for login in db.query(User).filter(User.employee_id == emp_id).all():
         login.is_active = e.status not in BLOCKING_STATUSES
+        if body.password:
+            login.password_hash = hash_password(body.password)
 
     db.commit(); db.refresh(e)
     result = _serialize(e)
