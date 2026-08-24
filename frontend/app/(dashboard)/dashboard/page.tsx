@@ -146,6 +146,53 @@ const announcements = [
   { title: "Quarterly all-hands on Friday", date: "15 Jun 09:12 AM", by: "CEO Office" },
 ];
 
+/** The "…" menus scattered around Home currently only expose one useful,
+ * always-safe action — re-fetching whatever data the page is showing. */
+function MoreMenu({ onRefresh, className, buttonClassName }: { onRefresh: () => void; className?: string; buttonClassName?: string }) {
+  const [open, setOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  async function refresh() {
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); setOpen(false); }
+  }
+
+  return (
+    <div ref={ref} className={cn("relative", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="More options"
+        className={cn("grid h-8 w-8 place-items-center rounded bg-white text-slate-700 shadow hover:bg-slate-50", buttonClassName)}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-1 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Badge({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <span className={cn("inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700", className)}>
@@ -228,7 +275,7 @@ function ProfileCard({
   );
 }
 
-function WorkTabs({ tabs, active, setActive }: { tabs: string[]; active: string; setActive: (tab: string) => void }) {
+function WorkTabs({ tabs, active, setActive, onRefresh }: { tabs: string[]; active: string; setActive: (tab: string) => void; onRefresh: () => void }) {
   return (
     <ContentCard className="overflow-hidden">
       <div className="flex items-center gap-1 overflow-x-auto px-4">
@@ -245,9 +292,7 @@ function WorkTabs({ tabs, active, setActive }: { tabs: string[]; active: string;
             {tab}
           </button>
         ))}
-        <button type="button" className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50">
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <MoreMenu onRefresh={onRefresh} className="ml-auto shrink-0" buttonClassName="h-9 w-9 shadow-none"/>
         <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50">
           <Settings2 className="h-4 w-4" />
         </button>
@@ -852,13 +897,53 @@ function WidgetCard({
   );
 }
 
+const WIDGET_TITLES = [
+  "Birthday", "New Hires", "Favorites", "Quick Links", "Announcements",
+  "Lop Summary", "Leave Report", "Upcoming Holidays", "My Pending Tasks",
+  "My Files", "Employee Engagement",
+];
+const HIDDEN_WIDGETS_KEY = "pp_hidden_widgets";
+
+function WidgetFilterMenu({ hidden, onToggle }: { hidden: Set<string>; onToggle: (title: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <Button variant="outline" size="icon" className="h-8 w-8" title="Filter widgets" onClick={() => setOpen((o) => !o)}>
+        <Settings2 className="h-3.5 w-3.5" />
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          <p className="px-3 py-1.5 text-xs font-medium text-slate-500">Show widgets</p>
+          {WIDGET_TITLES.map((title) => (
+            <label key={title} className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" checked={!hidden.has(title)} onChange={() => onToggle(title)} />
+              {title}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DashboardWidgets() {
   const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
   const [orgFiles, setOrgFiles] = useState<any[]>([]);
   const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
   const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  function loadWidgetData() {
     api.listFiles().then(setOrgFiles).catch(() => {});
     api.me().then(m => {
       if (!m.employee_id) return;
@@ -868,24 +953,40 @@ function DashboardWidgets() {
     api.holidays(new Date().getFullYear())
       .then(rows => setUpcomingHolidays(rows.filter((h: any) => h.holiday_date >= todayKey).slice(0, 5)))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadWidgetData();
+    try {
+      const saved = JSON.parse(localStorage.getItem(HIDDEN_WIDGETS_KEY) || "[]");
+      setHidden(new Set(saved));
+    } catch {}
   }, []);
+
+  function toggleWidget(title: string) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      try { localStorage.setItem(HIDDEN_WIDGETS_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-end gap-1">
-        <Button variant="outline" size="icon" className="h-8 w-8" title="Refresh">
-          <RefreshCw className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="outline" size="icon" className="h-8 w-8" title="Settings">
-          <Settings2 className="h-3.5 w-3.5" />
-        </Button>
+        <MoreMenu onRefresh={() => Promise.resolve(loadWidgetData())} buttonClassName="h-8 w-8 border border-slate-200 shadow-none"/>
+        <WidgetFilterMenu hidden={hidden} onToggle={toggleWidget}/>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {!hidden.has("Birthday") && (
         <WidgetCard title="Birthday" icon={Cake}>
           <EmptyState text="No birthdays today" />
         </WidgetCard>
+        )}
 
+        {!hidden.has("New Hires") && (
         <WidgetCard title="New Hires" icon={UserPlus}>
           <ul className="divide-y divide-slate-200">
             {newHires.map((person) => (
@@ -905,15 +1006,21 @@ function DashboardWidgets() {
             ))}
           </ul>
         </WidgetCard>
+        )}
 
+        {!hidden.has("Favorites") && (
         <WidgetCard title="Favorites" icon={Star}>
           <EmptyState text="No Favorites found." />
         </WidgetCard>
+        )}
 
+        {!hidden.has("Quick Links") && (
         <WidgetCard title="Quick Links" icon={Link2}>
           <EmptyState text="No quick links" />
         </WidgetCard>
+        )}
 
+        {!hidden.has("Announcements") && (
         <WidgetCard title="Announcements" icon={Megaphone}>
           <ul className="space-y-3">
             {announcements.map((item) => (
@@ -929,11 +1036,15 @@ function DashboardWidgets() {
             ))}
           </ul>
         </WidgetCard>
+        )}
 
+        {!hidden.has("Lop Summary") && (
         <WidgetCard title="Lop Summary" icon={CalendarMinus}>
           <EmptyState text="No pay period is configured" />
         </WidgetCard>
+        )}
 
+        {!hidden.has("Leave Report") && (
         <WidgetCard title="Leave Report" icon={CalendarCheck}>
           <div className="grid flex-1 grid-cols-3 gap-3">
             {[
@@ -951,7 +1062,9 @@ function DashboardWidgets() {
             ))}
           </div>
         </WidgetCard>
+        )}
 
+        {!hidden.has("Upcoming Holidays") && (
         <WidgetCard title="Upcoming Holidays" icon={CalendarDays}>
           {upcomingHolidays.length === 0 ? (
             <EmptyState text="No upcoming holidays" />
@@ -969,11 +1082,15 @@ function DashboardWidgets() {
             </ul>
           )}
         </WidgetCard>
+        )}
 
+        {!hidden.has("My Pending Tasks") && (
         <WidgetCard title="My Pending Tasks" icon={ListChecks} right={<Badge>0</Badge>}>
           <EmptyState text="There are no tasks available" />
         </WidgetCard>
+        )}
 
+        {!hidden.has("My Files") && (
         <WidgetCard
           title="My Files"
           icon={Folder}
@@ -1039,7 +1156,9 @@ function DashboardWidgets() {
             ) : <EmptyState text="No employee files found" />
           )}
         </WidgetCard>
+        )}
 
+        {!hidden.has("Employee Engagement") && (
         <WidgetCard
           title="Employee Engagement"
           icon={HeartPulse}
@@ -1051,6 +1170,7 @@ function DashboardWidgets() {
         >
           <EmptyState text="No pending surveys" />
         </WidgetCard>
+        )}
       </div>
     </div>
   );
@@ -1153,8 +1273,8 @@ function DashboardPageInner() {
 
   useEffect(() => { api.me().then(m => setRole(m.role)).catch(() => {}); }, []);
 
-  useEffect(() => {
-    api.dashboardOverview()
+  function loadOverview() {
+    return api.dashboardOverview()
       .then((data) => {
         setOverview(data);
         if (!workTabInitialized.current) {
@@ -1163,7 +1283,9 @@ function DashboardPageInner() {
         }
       })
       .catch((error) => setOverviewError(error.message || "Unable to load overview"));
-  }, [requestedTab]);
+  }
+
+  useEffect(() => { loadOverview(); }, [requestedTab]);
 
   function selectWorkTab(tab: string) {
     workTabInitialized.current = true;
@@ -1221,9 +1343,7 @@ function DashboardPageInner() {
               "linear-gradient(rgba(0,0,0,.15), rgba(0,0,0,.15)), url('https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1600&q=80')",
           }}
         />
-        <button className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded bg-white text-slate-700 shadow">
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <MoreMenu onRefresh={loadOverview} className="absolute right-4 top-4"/>
 
         <main className={cn("-mt-5 flex flex-col gap-2 px-4 pb-6 lg:px-10", mainTab === "overview" && "lg:flex-row")}>
           {mainTab === "overview" && overview && (
@@ -1233,7 +1353,7 @@ function DashboardPageInner() {
             {mainTab === "overview" && (
               overview ? (
                 <>
-                  <WorkTabs tabs={overview.tabs.length ? overview.tabs : workTabs} active={workTab} setActive={selectWorkTab} />
+                  <WorkTabs tabs={overview.tabs.length ? overview.tabs : workTabs} active={workTab} setActive={selectWorkTab} onRefresh={loadOverview} />
                   <ActivePanel active={workTab} data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} />
                   {overviewError && <p className="text-xs text-red-500">{overviewError}</p>}
                 </>
