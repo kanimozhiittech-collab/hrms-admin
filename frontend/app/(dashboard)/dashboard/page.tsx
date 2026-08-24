@@ -300,24 +300,30 @@ function ProfileCard({
 function WorkTabs({ tabs, active, setActive, onRefresh }: { tabs: string[]; active: string; setActive: (tab: string) => void; onRefresh: () => void }) {
   return (
     <ContentCard className="overflow-hidden">
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActive(tab)}
-            className={cn(
-              "h-11 shrink-0 border-b-2 border-transparent px-3 text-xs font-medium text-slate-700",
-              active === tab && "border-blue-500 text-slate-950"
-            )}
-          >
-            {tab}
+      <div className="flex items-center">
+        {/* Only the tab list scrolls — the "…" / settings buttons stay pinned and
+         * always visible, instead of scrolling away with a long tab list. */}
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-hide px-4">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActive(tab)}
+              className={cn(
+                "h-11 shrink-0 border-b-2 border-transparent px-3 text-xs font-medium text-slate-700",
+                active === tab && "border-blue-500 text-slate-950"
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="flex shrink-0 items-center gap-1 pr-4">
+          <MoreMenu onRefresh={onRefresh} buttonClassName="h-9 w-9 shadow-none"/>
+          <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50">
+            <Settings2 className="h-4 w-4" />
           </button>
-        ))}
-        <MoreMenu onRefresh={onRefresh} className="ml-auto shrink-0" buttonClassName="h-9 w-9 shadow-none"/>
-        <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-700 hover:bg-slate-50">
-          <Settings2 className="h-4 w-4" />
-        </button>
+        </div>
       </div>
     </ContentCard>
   );
