@@ -138,12 +138,12 @@ export default function EmployeesPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between p-4 border-t border-slate-100">
-            <div className="text-xs text-slate-500">Page {page} of {totalPages}</div>
+          <div className="flex flex-col items-center gap-2 p-4 border-t border-slate-100">
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</Button>
               <Button variant="outline" size="sm" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Next</Button>
             </div>
+            <div className="text-xs text-slate-500">Page {page} of {totalPages}</div>
           </div>
         </Card>
       </div>
