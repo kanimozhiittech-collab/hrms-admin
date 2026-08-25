@@ -8,6 +8,7 @@ import { tokenStore } from "@/lib/auth";
 import {
   Briefcase,
   Cake,
+  Camera,
   CalendarDays,
   CalendarCheck,
   CalendarMinus,
@@ -40,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Modal, ModalField } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const mainTabs = ["overview", "dashboard", "calendar"];
@@ -319,20 +321,70 @@ function ProfileCard({
   onCheckIn,
   checkingIn,
   isAdmin,
+  employeeId,
+  onPhotoUploaded,
 }: {
   data: OverviewData;
   onCheckIn: () => void;
   checkingIn: boolean;
   isAdmin: boolean;
+  employeeId?: string | null;
+  onPhotoUploaded?: () => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+
+  async function onSelectPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !employeeId) return;
+    setUploading(true);
+    try {
+      await api.uploadEmployeePhoto(employeeId, file);
+      onPhotoUploaded?.();
+      toast.success("Photo updated");
+    } catch (err: any) {
+      toast.error(err.message || "Photo upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <aside className="relative z-10 w-full shrink-0 rounded-md border border-slate-200 bg-white px-4 pb-4 pt-0 text-center shadow-sm lg:w-56">
-      <div className="mx-auto -mt-12 grid h-20 w-20 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-        {data.profile.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={`${API_BASE}${data.profile.photo_url}`} alt={data.profile.name} className="h-full w-full object-cover"/>
-        ) : (
-          <CircleUserRound className="h-16 w-16 text-slate-300" />
+      <div className="relative mx-auto -mt-12 h-20 w-20">
+        <label
+          htmlFor={employeeId ? "profile-photo-upload" : undefined}
+          title={employeeId ? "Change photo" : "Link an employee profile to upload a photo"}
+          className={cn(
+            "group grid h-20 w-20 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-100",
+            employeeId && "cursor-pointer"
+          )}
+        >
+          {data.profile.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`${API_BASE}${data.profile.photo_url}`} alt={data.profile.name} className="h-full w-full object-cover"/>
+          ) : (
+            <CircleUserRound className="h-16 w-16 text-slate-300" />
+          )}
+          {employeeId && (
+            <div className="absolute inset-0 grid place-items-center rounded-md bg-black/0 text-transparent transition group-hover:bg-black/40 group-hover:text-white">
+              {uploading ? (
+                <RefreshCw className="h-5 w-5 animate-spin"/>
+              ) : (
+                <Camera className="h-5 w-5"/>
+              )}
+            </div>
+          )}
+        </label>
+        {employeeId && (
+          <input
+            id="profile-photo-upload"
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={uploading}
+            onChange={onSelectPhoto}
+          />
         )}
       </div>
       <p className="mt-3 text-sm font-semibold text-slate-900">
@@ -1386,13 +1438,14 @@ function DashboardPageInner() {
   // check-in button) until we actually know — otherwise the button briefly
   // flashes in for admin logins and then disappears once /me resolves.
   const [role, setRole] = useState<string | null>(null);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
   const isAdmin = role === null || ADMIN_ROLES.includes(role);
   // Tracks whether the active work-tab has been set (by URL param, the initial
   // load, or a manual click) — once true, later overview reloads must never
   // silently override a tab the user has already picked.
   const workTabInitialized = useRef(false);
 
-  useEffect(() => { api.me().then(m => setRole(m.role)).catch(() => {}); }, []);
+  useEffect(() => { api.me().then(m => { setRole(m.role); setEmployeeId(m.employee_id ?? null); }).catch(() => {}); }, []);
 
   function loadOverview() {
     return api.dashboardOverview()
@@ -1468,7 +1521,7 @@ function DashboardPageInner() {
 
         <main className={cn("-mt-5 flex flex-col gap-2 px-4 pb-6 lg:px-10", mainTab === "overview" && "lg:flex-row")}>
           {mainTab === "overview" && overview && (
-            <ProfileCard data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} />
+            <ProfileCard data={overview} onCheckIn={handleCheckIn} checkingIn={checkingIn} isAdmin={isAdmin} employeeId={employeeId} onPhotoUploaded={loadOverview} />
           )}
           <div className="min-w-0 flex-1 space-y-2">
             {mainTab === "overview" && (
