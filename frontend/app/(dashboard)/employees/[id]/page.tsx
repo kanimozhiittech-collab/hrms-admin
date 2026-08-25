@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 
 const DOC_TYPES = ["Aadhaar", "PAN", "Passport", "Resume", "OfferLetter", "Certificate", "Other"];
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -556,7 +556,7 @@ export default function EmployeeDetailPage() {
                           </div>
                         </div>
                         <a
-                          href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${doc.file_url}`}
+                          href={fileUrl(doc.file_url)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-sm font-medium text-brand-700 hover:underline"

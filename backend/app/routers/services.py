@@ -1,11 +1,6 @@
-import shutil
-import uuid
-import tempfile
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from datetime import date
@@ -20,12 +15,10 @@ from ..schemas import (
     ExitDetailIn, ExitStatusIn, ExitDetailOut,
     MeetingIn, MeetingOut,
 )
+from ..core.storage import save_upload
 from .deps import current_user
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
-# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
-# Windows/antivirus and silently loses uploaded files, which happened in prod.
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 
 def _require_hr(user: User):
@@ -69,32 +62,15 @@ def upload_file(
     user: User = Depends(current_user),
 ):
     _require_hr(user)
-    ext = Path(file.filename or "").suffix
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
+    _, file_url = save_upload(file, "org-files")
     org_file = OrgFile(
         company_id=user.company_id, name=name, description=description or None,
-        folder=folder or None, file_url=f"/api/files/raw/{fname}", uploaded_by=user.id,
+        folder=folder or None, file_url=file_url, uploaded_by=user.id,
     )
     db.add(org_file)
     db.commit()
     db.refresh(org_file)
     return org_file
-
-
-@files_router.get("/raw/{fname}")
-def get_file(fname: str):
-    # No auth here, same as the other file-serving routes (employee documents,
-    # company logo) — a plain <a href> / new-tab click can't carry the
-    # Authorization header, and the random filename is the effective capability
-    # token, so this matches the existing pattern rather than fighting it.
-    fpath = UPLOAD_DIR / fname
-    if not fpath.exists():
-        raise HTTPException(404)
-    return FileResponse(fpath)
 
 
 @files_router.delete("/{file_id}", status_code=204)

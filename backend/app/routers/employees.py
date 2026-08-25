@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError
-from pathlib import Path
-import re, shutil, tempfile, uuid
+import re
 from typing import Optional
 from ..database import get_db
 from ..models import (Employee, EmployeeAddress, EducationRecord, ExperienceRecord,
@@ -14,12 +12,10 @@ from ..models.attendance import AttendanceLog, RegularizationRequest
 from ..models.services import OrgFile
 from ..schemas import EmployeeIn, EmployeeOut, EmployeeListResponse, EmployeeListItem, DocumentOut
 from ..core.security import hash_password
+from ..core.storage import save_upload
 from .deps import current_user
 
 router = APIRouter(prefix="/api/employees", tags=["employees"])
-# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
-# Windows/antivirus and silently loses uploaded files, which happened in prod.
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 # Default password every new employee uses for their first login.
 DEFAULT_EMPLOYEE_PASSWORD = "Welcome@123"
@@ -123,13 +119,6 @@ def list_employees(
         date_of_joining=r.date_of_joining, reporting_manager_id=r.reporting_manager_id,
     ) for r in rows]
     return EmployeeListResponse(items=items, total=total, page=page, page_size=page_size)
-
-
-@router.get("/files/{fname}")
-def get_file(fname: str):
-    fpath = UPLOAD_DIR / fname
-    if not fpath.exists(): raise HTTPException(404)
-    return FileResponse(fpath)
 
 
 @router.get("/directory/list")
@@ -290,14 +279,8 @@ def upload_document(emp_id: str, doc_type: str = Form(...), file: UploadFile = F
         raise HTTPException(403, "Not authorized")
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
-    ext = Path(file.filename or "").suffix
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
-    doc = EmployeeDocument(employee_id=e.id, doc_type=doc_type,
-                           file_name=file.filename or fname,
-                           file_url=f"/api/employees/files/{fname}")
+    file_name, file_url = save_upload(file, "employee-documents")
+    doc = EmployeeDocument(employee_id=e.id, doc_type=doc_type, file_name=file_name, file_url=file_url)
     db.add(doc); db.commit(); db.refresh(doc)
     return doc
 
@@ -309,23 +292,13 @@ def upload_photo(emp_id: str, file: UploadFile = File(...),
         raise HTTPException(403, "Not authorized")
     e = db.query(Employee).filter(Employee.id == emp_id, Employee.company_id == user.company_id).first()
     if not e: raise HTTPException(404, "Not found")
-    ext = Path(file.filename or "").suffix or ".jpg"
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
-    e.photo_url = f"/api/employees/files/{fname}"
+    _, e.photo_url = save_upload(file, "employee-photos")
     db.commit(); db.refresh(e)
     return _serialize(e)
 
 
 def _save_upload(file: UploadFile) -> tuple[str, str]:
-    ext = Path(file.filename or "").suffix
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
-    return file.filename or fname, f"/api/employees/files/{fname}"
+    return save_upload(file, "employee-documents")
 
 
 @router.post("/{emp_id}/education/{edu_id}/file")

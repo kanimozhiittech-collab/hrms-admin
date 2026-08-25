@@ -1,9 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import date, datetime
-from pathlib import Path
-import shutil, uuid
 from typing import List, Optional
 
 from ..database import get_db
@@ -17,12 +14,10 @@ from ..schemas.leave import (
     LeaveReview, LeaveCalendarItem,
 )
 from ..core.worktime import working_days, iter_dates, is_weekend
+from ..core.storage import save_upload
 from .deps import current_user
 
 router = APIRouter(prefix="/api/leave", tags=["leave"])
-# Persistent local folder (gitignored) -- matches the pattern used for employee
-# uploads; the OS temp dir gets cleared by Windows/antivirus and silently loses files.
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 HR_ROLES = {"super_admin", "company_admin", "hr_manager"}
 
@@ -405,13 +400,7 @@ def upload_leave_document(
     if req.status != LR_PENDING:
         raise HTTPException(status_code=400, detail="Cannot attach a document to a reviewed request")
 
-    ext = Path(file.filename or "").suffix
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f: shutil.copyfileobj(file.file, f)
-    req.file_name = file.filename or fname
-    req.file_url = f"/api/employees/files/{fname}"
+    req.file_name, req.file_url = save_upload(file, "leave-documents")
     db.commit()
     db.refresh(req)
     names = _name_map(db, user.company_id)

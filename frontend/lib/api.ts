@@ -3,6 +3,15 @@ import { tokenStore } from "./auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+/** Uploaded-file URLs (photos, documents, logos) come back from the API in
+ * two shapes depending on when they were uploaded: newer ones are full
+ * https://...blob.vercel-storage.com/... URLs (Vercel Blob, used as-is),
+ * older/legacy ones were a path relative to our own API. Handles both. */
+export function fileUrl(url?: string | null): string {
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : `${BASE}${url}`;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   const isFormData = init.body instanceof FormData;

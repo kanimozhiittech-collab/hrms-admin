@@ -8,17 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { Plus, Search, Download, LayoutList, LayoutGrid } from "lucide-react";
 
 const STATUS_TONE: Record<string, any> = { Active: "green", "On Leave": "amber", Inactive: "slate", Resigned: "red" };
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 
 function EmployeeAvatar({ e, size = "h-9 w-9 text-sm" }: { e: any; size?: string }) {
   return e.photo_url ? (
-    <img src={`${API_URL}${e.photo_url}`} alt={`${e.first_name} ${e.last_name}`} className={`${size} rounded-full object-cover shrink-0`}/>
+    <img src={fileUrl(e.photo_url)} alt={`${e.first_name} ${e.last_name}`} className={`${size} rounded-full object-cover shrink-0`}/>
   ) : (
     <div className={`${size} rounded-full bg-brand-100 text-brand-700 grid place-items-center font-semibold shrink-0`}>
       {e.first_name[0]}{e.last_name[0]}

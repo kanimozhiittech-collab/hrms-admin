@@ -39,11 +39,10 @@ import { useSidebar } from "@/lib/sidebar-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal, ModalField } from "@/components/ui/modal";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const mainTabs = ["overview", "dashboard", "calendar"];
 // Admin logins (super_admin/company_admin) often have no linked Employee record
 // of their own, so check-in/attendance tracking doesn't apply to them — only
@@ -362,7 +361,7 @@ function ProfileCard({
         >
           {data.profile.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`${API_BASE}${data.profile.photo_url}`} alt={data.profile.name} className="h-full w-full object-cover"/>
+            <img src={fileUrl(data.profile.photo_url)} alt={data.profile.name} className="h-full w-full object-cover"/>
           ) : (
             <CircleUserRound className="h-16 w-16 text-slate-300" />
           )}
@@ -731,7 +730,7 @@ function FilesPanel() {
                     <p className="truncate text-sm font-medium text-slate-900">{f.name}</p>
                     {f.folder && <p className="text-xs text-slate-500">{f.folder}</p>}
                   </div>
-                  <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                  <a href={fileUrl(f.file_url)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
                     View
                   </a>
                 </li>
@@ -747,7 +746,7 @@ function FilesPanel() {
                     <p className="truncate text-sm font-medium text-slate-900">{f.file_name}</p>
                     <p className="text-xs text-slate-500">{f.doc_type}</p>
                   </div>
-                  <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                  <a href={fileUrl(f.file_url)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
                     View
                   </a>
                 </li>
@@ -1301,7 +1300,7 @@ function DashboardWidgets() {
                       <p className="truncate text-sm font-medium text-slate-900">{f.name}</p>
                       {f.folder && <p className="text-xs text-slate-500">{f.folder}</p>}
                     </div>
-                    <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                    <a href={fileUrl(f.file_url)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
                       View
                     </a>
                   </li>
@@ -1317,7 +1316,7 @@ function DashboardWidgets() {
                       <p className="truncate text-sm font-medium text-slate-900">{f.file_name}</p>
                       <p className="text-xs text-slate-500">{f.doc_type}</p>
                     </div>
-                    <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
+                    <a href={fileUrl(f.file_url)} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
                       View
                     </a>
                   </li>

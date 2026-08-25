@@ -1,23 +1,16 @@
 import io
-import shutil
-import uuid
-import tempfile
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
 from PIL import Image
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Company, User
 from ..schemas import CompanyUpdateIn, CompanyOut
+from ..core.storage import save_bytes
 from .deps import current_user
 
 router = APIRouter(prefix="/api/company", tags=["company"])
-# Persistent local folder (gitignored) -- the OS temp dir gets cleared by
-# Windows/antivirus and silently loses uploaded files, which happened in prod.
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 LOGO_MAX_BYTES = 500 * 1024
 LOGO_WIDTH = 80
@@ -71,21 +64,7 @@ def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), use
             400, f"Logo must be exactly {LOGO_WIDTH}x{LOGO_HEIGHT}px (uploaded image is {img.width}x{img.height}px)"
         )
 
-    ext = Path(file.filename or "").suffix
-    fname = f"{uuid.uuid4().hex}{ext}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    fpath = UPLOAD_DIR / fname
-    with fpath.open("wb") as f:
-        f.write(raw)
-    company.logo_url = f"/api/company/logo/{fname}"
+    _, company.logo_url = save_bytes(raw, file.filename, "company-logos")
     db.commit()
     db.refresh(company)
     return company
-
-
-@router.get("/logo/{fname}")
-def get_logo(fname: str):
-    fpath = UPLOAD_DIR / fname
-    if not fpath.exists():
-        raise HTTPException(404)
-    return FileResponse(fpath)

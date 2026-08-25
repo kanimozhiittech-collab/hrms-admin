@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { Plus, Trash2, Upload, Save, X, Eye, EyeOff } from "lucide-react";
 
 /* ---------- Schema ---------- */
@@ -251,7 +251,7 @@ function StatutoryDocUpload({ docType, file, existing, onSelect }: {
         {file ? file.name : existing ? "Replace document" : `Upload ${docType} document`}
       </label>
       {!file && existing && (
-        <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${existing.file_url}`} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">View current</a>
+        <a href={fileUrl(existing.file_url)} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">View current</a>
       )}
     </div>
   );
@@ -271,7 +271,7 @@ function RowFileUpload({ id, label, file, existingUrl, existingName, onSelect }:
         {file ? file.name : existingUrl ? "Replace" : label}
       </label>
       {!file && existingUrl && (
-        <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${existingUrl}`} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">
+        <a href={fileUrl(existingUrl)} target="_blank" rel="noreferrer" className="ml-2 text-slate-400 hover:text-slate-700 hover:underline">
           {existingName || "View"}
         </a>
       )}
@@ -436,7 +436,7 @@ export function EmployeeForm({
                       {photoFile ? (
                         <img src={URL.createObjectURL(photoFile)} alt="Photo preview" className="h-full w-full object-cover"/>
                       ) : methods.watch("photo_url") ? (
-                        <img src={`${process.env.NEXT_PUBLIC_API_URL || ""}${methods.watch("photo_url")}`} alt="Photo" className="h-full w-full object-cover"/>
+                        <img src={fileUrl(methods.watch("photo_url"))} alt="Photo" className="h-full w-full object-cover"/>
                       ) : (
                         <Upload className="h-6 w-6 text-slate-300"/>
                       )}

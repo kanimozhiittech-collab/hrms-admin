@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -9,8 +11,15 @@ class Settings(BaseSettings):
     SEED_ON_BOOT: str = "1"
     PROVISION_SECRET: str = "dev-provision-secret"
     SUPER_ADMIN_URL: str = "http://localhost:8001"
+    BLOB_READ_WRITE_TOKEN: str = ""
 
     class Config:
         env_file = ".env"
 
 settings = Settings()
+
+# The vercel_blob package reads this straight from the process environment —
+# in production Vercel already injects it there, but locally it only lands in
+# our pydantic Settings (via .env), so mirror it across for local dev.
+if settings.BLOB_READ_WRITE_TOKEN:
+    os.environ.setdefault("BLOB_READ_WRITE_TOKEN", settings.BLOB_READ_WRITE_TOKEN)

@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, Clock, CalendarDays, Wallet, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, LifeBuoy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { useSidebar } from "@/lib/sidebar-context";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const baseNav = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -62,7 +61,7 @@ export function Sidebar() {
       <div className={cn("py-5 flex items-center gap-2 border-b border-white/10", collapsed ? "md:px-3 md:justify-center px-5" : "px-5")}>
         {company?.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={`${API_URL}${company.logo_url}`} alt={company.name || "Logo"} className="h-9 w-9 shrink-0 rounded-lg object-cover"/>
+          <img src={fileUrl(company.logo_url)} alt={company.name || "Logo"} className="h-9 w-9 shrink-0 rounded-lg object-cover"/>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src="/logo.png" alt="Logo" className="h-9 w-9 shrink-0 rounded-lg object-contain"/>

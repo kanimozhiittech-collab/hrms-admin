@@ -7,11 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { Plus, X, CheckCircle2, XCircle, CalendarDays, Search, Upload } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 const STATUS_TONE: Record<string, any> = {
   approved: "green", rejected: "red", pending: "amber", cancelled: "slate",
@@ -156,7 +155,7 @@ export default function LeavesPage() {
                         <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{r.reason}</td>
                         <td className="px-4 py-3">
                           {r.file_url ? (
-                            <a href={`${API_BASE}${r.file_url}`} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline">View</a>
+                            <a href={fileUrl(r.file_url)} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline">View</a>
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>

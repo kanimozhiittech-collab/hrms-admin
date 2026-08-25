@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal, ModalField } from "@/components/ui/modal";
-import { api } from "@/lib/api";
+import { api, fileUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye, Search,
@@ -21,7 +21,6 @@ import {
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 const ADMIN_ROLES = ["super_admin", "company_admin"];
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 const SERVICES = [
   { key: "manage-accounts", label: "Manage Accounts", icon: Users, status: "ready" as const },
@@ -737,7 +736,7 @@ function OrganizationDetailsService() {
             <ModalField label="Logo">
               <div className="flex items-center gap-3">
                 {company?.logo_url
-                  ? <img src={`${API_BASE}${company.logo_url}`} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200"/>
+                  ? <img src={fileUrl(company.logo_url)} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200"/>
                   : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
                 <div>
                   <label className="text-sm text-brand-600 hover:underline cursor-pointer">
@@ -1476,7 +1475,7 @@ function FilesService() {
               </div>
               {f.description && <div className="text-xs text-slate-500 truncate">{f.description}</div>}
             </div>
-            <a href={`${API_BASE}${f.file_url}`} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-600">
+            <a href={fileUrl(f.file_url)} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-600">
               <Download className="h-4 w-4"/>
             </a>
             <button onClick={() => remove(f.id)} className="text-slate-400 hover:text-red-600">
