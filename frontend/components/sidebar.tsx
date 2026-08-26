@@ -13,13 +13,16 @@ const baseNav = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/attendance", label: "Attendance", icon: Clock },
   { href: "/leaves", label: "Leaves", icon: CalendarDays },
-  { href: "/support", label: "Support", icon: LifeBuoy },
 ];
 const hrNav = { href: "/employees", label: "Employees", icon: Users };
 const soon = [
   { label: "Payroll", icon: Wallet },
   { label: "Documents", icon: FileText },
   { label: "Reports", icon: BarChart3 },
+];
+const bottomNav = [
+  { href: "/support", label: "Support", icon: LifeBuoy },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -45,10 +48,11 @@ export function Sidebar() {
     });
   }
 
-  const settingsNav = { href: "/settings", label: "Settings", icon: Settings };
   const nav = isHR
-    ? [baseNav[0], hrNav, ...baseNav.slice(1), settingsNav]
+    ? [baseNav[0], hrNav, ...baseNav.slice(1)]
     : baseNav;
+  // Settings is HR/admin-only; Support is for everyone.
+  const bottomLinks = isHR ? bottomNav : bottomNav.filter(i => i.href !== "/settings");
 
   const sidebarContent = (
     <aside className={cn(
@@ -81,7 +85,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 p-3 space-y-6">
+      <nav className="flex flex-1 flex-col gap-6 p-3">
         <div>
           <div className={cn("px-2 mb-2 text-[10px] uppercase tracking-wider text-slate-400", collapsed && "md:hidden")}>Overview</div>
           <div className="space-y-0.5">
@@ -111,6 +115,22 @@ export function Sidebar() {
                 <span className={cn("ml-auto text-[9px] tracking-wider uppercase text-slate-500", collapsed && "md:hidden")}>Soon</span>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="mt-auto">
+          <div className="space-y-0.5">
+            {bottomLinks.map(i => {
+              const active = pathname === i.href || pathname.startsWith(i.href);
+              return (
+                <Link key={i.href} href={i.href} title={collapsed ? i.label : undefined}
+                  className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm",
+                    collapsed && "md:justify-center md:px-0",
+                    active ? "bg-brand-600 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white")}>
+                  <i.icon className="h-4 w-4 shrink-0"/>
+                  <span className={cn(collapsed && "md:hidden")}>{i.label}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>
