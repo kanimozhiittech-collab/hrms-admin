@@ -26,11 +26,18 @@ function fmtTime(dt?: string) {
   return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Late is stored in minutes but shown in the same "Xh" style as the Hours
- * column, so the two line up instead of mixing units in one table. */
-function fmtLateHours(minutes?: number | null) {
+/** Decimal hours (work_hours, overtime_hours, ...) shown as "3h 34m" instead
+ * of "3.57h" — easier to read at a glance than a decimal fraction of an hour. */
+function fmtHoursHM(hours?: number | null) {
+  if (hours == null) return "—";
+  const total = Math.round(hours * 60);
+  return `${Math.floor(total / 60)}h ${total % 60}m`;
+}
+
+/** Same "Xh Ym" style, for values already stored in minutes (late_minutes). */
+function fmtMinutesHM(minutes?: number | null) {
   if (!minutes) return "—";
-  return `${(minutes / 60).toFixed(2)}h`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 export default function AttendancePage() {
@@ -160,8 +167,8 @@ export default function AttendancePage() {
                 { label: "Absent", value: summary?.absent ?? 0, tone: "text-red-600" },
                 { label: "On Leave", value: summary?.on_leave ?? 0, tone: "text-blue-600" },
                 { label: "Late", value: summary?.late_count ?? 0, tone: "text-amber-600" },
-                { label: "Work Hrs", value: summary?.total_work_hours ?? 0, tone: "text-slate-800" },
-                { label: "Overtime", value: summary?.total_overtime ?? 0, tone: "text-violet-600" },
+                { label: "Work Hrs", value: fmtHoursHM(summary?.total_work_hours ?? 0), tone: "text-slate-800" },
+                { label: "Overtime", value: fmtHoursHM(summary?.total_overtime ?? 0), tone: "text-violet-600" },
               ].map(s => (
                 <Card key={s.label} className="p-4">
                   <div className={`text-2xl font-bold tabular-nums ${s.tone}`}>{s.value}</div>
@@ -198,9 +205,9 @@ export default function AttendancePage() {
                         </td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_in_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_out_at)}</td>
-                        <td className="px-4 py-3 tabular-nums text-slate-700">{l.work_hours != null ? `${l.work_hours}h` : "—"}</td>
-                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtLateHours(l.late_minutes)}</span> : "—"}</td>
-                        <td className="px-4 py-3 tabular-nums">{l.overtime_hours ? <span className="text-violet-600">{l.overtime_hours}h</span> : "—"}</td>
+                        <td className="px-4 py-3 tabular-nums text-slate-700">{fmtHoursHM(l.work_hours)}</td>
+                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtMinutesHM(l.late_minutes)}</span> : "—"}</td>
+                        <td className="px-4 py-3 tabular-nums">{l.overtime_hours ? <span className="text-violet-600">{fmtHoursHM(l.overtime_hours)}</span> : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -256,8 +263,8 @@ export default function AttendancePage() {
                         <td className="px-4 py-3"><Badge tone={STATUS_TONE[l.status] || "slate"}>{STATUS_LABEL[l.status] || l.status}</Badge></td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_in_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_out_at)}</td>
-                        <td className="px-4 py-3 tabular-nums text-slate-700">{l.work_hours != null ? `${l.work_hours}h` : "—"}</td>
-                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtLateHours(l.late_minutes)}</span> : "—"}</td>
+                        <td className="px-4 py-3 tabular-nums text-slate-700">{fmtHoursHM(l.work_hours)}</td>
+                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtMinutesHM(l.late_minutes)}</span> : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
