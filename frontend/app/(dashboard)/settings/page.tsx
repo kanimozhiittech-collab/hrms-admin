@@ -679,6 +679,7 @@ function OrganizationDetailsService() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -714,7 +715,7 @@ function OrganizationDetailsService() {
 
   async function uploadLogo(file: File) {
     setUploadingLogo(true); setError("");
-    try { setCompany(await api.uploadCompanyLogo(file)); }
+    try { setCompany(await api.uploadCompanyLogo(file)); setLogoFailed(false); }
     catch (e: any) { setError(e.message); }
     finally { setUploadingLogo(false); }
   }
@@ -735,8 +736,8 @@ function OrganizationDetailsService() {
           <div>
             <ModalField label="Logo">
               <div className="flex items-center gap-3">
-                {company?.logo_url
-                  ? <img src={fileUrl(company.logo_url)} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200"/>
+                {company?.logo_url && !logoFailed
+                  ? <img src={fileUrl(company.logo_url)} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-slate-200" onError={() => setLogoFailed(true)}/>
                   : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
                 <div>
                   <label className="text-sm text-brand-600 hover:underline cursor-pointer">

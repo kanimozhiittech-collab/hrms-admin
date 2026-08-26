@@ -30,10 +30,15 @@ export function Sidebar() {
   const [isHR, setIsHR] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [company, setCompany] = useState<{ name?: string; logo_url?: string } | null>(null);
+  const [logoFailed, setLogoFailed] = useState(false);
   const { mobileOpen, setMobileOpen } = useSidebar();
 
   useEffect(() => { api.me().then(m => setIsHR(HR_ROLES.includes(m.role))).catch(() => {}); }, []);
   useEffect(() => { api.getCompany().then(setCompany).catch(() => {}); }, []);
+  // A logo uploaded before the storage migration to Vercel Blob points at a
+  // URL that no longer resolves — fall back to the default mark instead of
+  // showing a permanently broken image.
+  useEffect(() => { setLogoFailed(false); }, [company?.logo_url]);
   useEffect(() => {
     setCollapsed(localStorage.getItem("pp_sidebar_collapsed") === "1");
   }, []);
@@ -63,9 +68,14 @@ export function Sidebar() {
       "w-64"
     )}>
       <div className={cn("py-5 flex items-center gap-2 border-b border-white/10", collapsed ? "md:px-3 md:justify-center px-5" : "px-5")}>
-        {company?.logo_url ? (
+        {company?.logo_url && !logoFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={fileUrl(company.logo_url)} alt={company.name || "Logo"} className="h-9 w-9 shrink-0 rounded-lg object-cover"/>
+          <img
+            src={fileUrl(company.logo_url)}
+            alt={company.name || "Logo"}
+            className="h-9 w-9 shrink-0 rounded-lg object-cover"
+            onError={() => setLogoFailed(true)}
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src="/logo.png" alt="Logo" className="h-9 w-9 shrink-0 rounded-lg object-contain"/>
