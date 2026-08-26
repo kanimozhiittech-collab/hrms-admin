@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from ..database import get_db
 from ..models import AttendanceLog, Company, Employee, Department, Designation, Shift, User
 from ..models.attendance import ATT_PRESENT
-from ..core.worktime import compute_log_metrics
+from ..core.worktime import compute_log_metrics, now_ist, today_ist
 from ..schemas import DashboardStats
 from ..schemas.dashboard import (
     Activity,
@@ -106,8 +106,8 @@ def _overview_payload(db: Session, user: User) -> DashboardOverview:
     if employee and employee.designation_id:
         designation = db.get(Designation, employee.designation_id)
 
-    today = date.today()
-    now = datetime.now()
+    today = today_ist()
+    now = now_ist()
     log = _today_log(db, user, today)
     week_start, week_end, week = _week_rows(today)
     shift_info = _shift_display(shift)
@@ -210,7 +210,7 @@ def stats(db: Session = Depends(get_db), user: User = Depends(current_user)):
         growth.append(GrowthPoint(month=label, count=cnt))
 
     # ── real attendance from AttendanceLog ──
-    today = date.today()
+    today = today_ist()
     today_logs = db.query(AttendanceLog).filter(
         AttendanceLog.company_id == cid, AttendanceLog.work_date == today
     ).all()
@@ -276,8 +276,8 @@ def _apply_metrics(db: Session, log: AttendanceLog, user: User):
 
 @router.post("/check-in", response_model=DashboardOverview)
 def check_in(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    today = date.today()
-    now = datetime.now()
+    today = today_ist()
+    now = now_ist()
     log = _today_log(db, user, today)
     if not log:
         log = AttendanceLog(

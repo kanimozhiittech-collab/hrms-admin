@@ -26,6 +26,13 @@ function fmtTime(dt?: string) {
   return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Late is stored in minutes but shown in the same "Xh" style as the Hours
+ * column, so the two line up instead of mixing units in one table. */
+function fmtLateHours(minutes?: number | null) {
+  if (!minutes) return "—";
+  return `${(minutes / 60).toFixed(2)}h`;
+}
+
 export default function AttendancePage() {
   const now = new Date();
   const [tab, setTab] = useState<"my" | "team" | "regularize">("my");
@@ -192,7 +199,7 @@ export default function AttendancePage() {
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_in_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_out_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{l.work_hours != null ? `${l.work_hours}h` : "—"}</td>
-                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{l.late_minutes}m</span> : "—"}</td>
+                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtLateHours(l.late_minutes)}</span> : "—"}</td>
                         <td className="px-4 py-3 tabular-nums">{l.overtime_hours ? <span className="text-violet-600">{l.overtime_hours}h</span> : "—"}</td>
                       </tr>
                     ))}
@@ -250,7 +257,7 @@ export default function AttendancePage() {
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_in_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{fmtTime(l.check_out_at)}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-700">{l.work_hours != null ? `${l.work_hours}h` : "—"}</td>
-                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{l.late_minutes}m</span> : "—"}</td>
+                        <td className="px-4 py-3 tabular-nums">{l.late_minutes ? <span className="text-amber-600">{fmtLateHours(l.late_minutes)}</span> : "—"}</td>
                       </tr>
                     ))}
                   </tbody>

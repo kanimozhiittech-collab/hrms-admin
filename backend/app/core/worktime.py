@@ -1,6 +1,29 @@
 """Shared helpers for attendance & leave time calculations."""
 from datetime import date, datetime, timedelta
 from typing import Iterable
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def now_ist() -> datetime:
+    """Current time as a naive datetime holding IST wall-clock values.
+
+    In production this runs on servers whose system clock is UTC, so a plain
+    datetime.now() silently returns UTC — check-in/check-out times, shift
+    start/end ("09:30" etc, meant as IST), and every metric derived from
+    comparing them all only line up if "now" is IST too. Naive-but-IST (not
+    tz-aware) matches how check_in_at/check_out_at are already stored and
+    how the frontend renders them (new Date() on a Z-less ISO string is
+    treated as browser-local time, i.e. IST for users in India).
+    """
+    return datetime.now(IST).replace(tzinfo=None)
+
+
+def today_ist() -> date:
+    """Today's date in IST — matters near midnight, where the UTC calendar
+    day can already differ from the IST one by up to 5.5 hours."""
+    return now_ist().date()
 
 
 def parse_hhmm(value: str | None, default: str) -> tuple[int, int]:
