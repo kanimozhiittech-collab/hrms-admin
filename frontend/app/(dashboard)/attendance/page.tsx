@@ -26,18 +26,25 @@ function fmtTime(dt?: string) {
   return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Decimal hours (work_hours, overtime_hours, ...) shown as "3h 34m" instead
- * of "3.57h" — easier to read at a glance than a decimal fraction of an hour. */
-function fmtHoursHM(hours?: number | null) {
-  if (hours == null) return "—";
-  const total = Math.round(hours * 60);
-  return `${Math.floor(total / 60)}h ${total % 60}m`;
+/** "3h 34m" instead of "3.57h" — and drops the "0h"/"0m" side entirely when
+ * it's zero, so a 3-minute gap reads as "3m", not the noisier "0h 3m". */
+function fmtHM(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
-/** Same "Xh Ym" style, for values already stored in minutes (late_minutes). */
+function fmtHoursHM(hours?: number | null) {
+  if (hours == null) return "—";
+  return fmtHM(Math.round(hours * 60));
+}
+
+/** Same style, for values already stored in minutes (late_minutes). */
 function fmtMinutesHM(minutes?: number | null) {
   if (!minutes) return "—";
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return fmtHM(minutes);
 }
 
 export default function AttendancePage() {
