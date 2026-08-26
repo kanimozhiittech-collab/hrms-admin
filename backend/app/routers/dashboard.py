@@ -46,6 +46,18 @@ def _display_name(user: User, employee: Employee | None) -> str:
         return employee.display_name or f"{employee.first_name} {employee.last_name}".strip()
     return user.email.split("@")[0].replace(".", " ").replace("_", " ").title()
 
+def _resolve_shift(db: Session, employee: Employee | None, company_id: str) -> Shift | None:
+    """An employee's own assigned shift (Settings > Shifts, picked per-person
+    on their Job tab) takes priority. Only fall back to "any shift in the
+    company" when they don't have one set — e.g. an admin login with no
+    employee record, or an employee nobody's assigned a shift to yet."""
+    if employee and employee.shift_id:
+        shift = db.query(Shift).filter(Shift.id == employee.shift_id, Shift.company_id == company_id).first()
+        if shift:
+            return shift
+    return db.query(Shift).filter(Shift.company_id == company_id).first()
+
+
 def _shift_display(shift: Shift | None) -> OverviewShift:
     name = shift.name if shift else "General"
     start = shift.start_time if shift else "09:00"
@@ -101,7 +113,7 @@ def _overview_payload(db: Session, user: User) -> DashboardOverview:
         employee = db.query(Employee).filter(Employee.company_id == user.company_id, Employee.work_email == user.email).first()
 
     company = db.get(Company, user.company_id)
-    shift = db.query(Shift).filter(Shift.company_id == user.company_id).first()
+    shift = _resolve_shift(db, employee, user.company_id)
     designation = None
     if employee and employee.designation_id:
         designation = db.get(Designation, employee.designation_id)
@@ -260,9 +272,10 @@ def stats(db: Session = Depends(get_db), user: User = Depends(current_user)):
 def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
     return _overview_payload(db, user)
 
-def _apply_metrics(db: Session, log: AttendanceLog, user: User):
-    """Compute work_hours / overtime / late / early-exit from the company shift."""
-    shift = db.query(Shift).filter(Shift.company_id == user.company_id).first()
+def _apply_metrics(db: Session, log: AttendanceLog, user: User, employee: Employee | None):
+    """Compute work_hours / overtime / late / early-exit from the employee's
+    assigned shift (see _resolve_shift)."""
+    shift = _resolve_shift(db, employee, user.company_id)
     start = shift.start_time if shift else "09:00"
     end = shift.end_time if shift else "18:00"
     metrics = compute_log_metrics(
@@ -278,6 +291,11 @@ def _apply_metrics(db: Session, log: AttendanceLog, user: User):
 def check_in(db: Session = Depends(get_db), user: User = Depends(current_user)):
     today = today_ist()
     now = now_ist()
+    employee = None
+    if user.employee_id:
+        employee = db.query(Employee).filter(Employee.id == user.employee_id, Employee.company_id == user.company_id).first()
+    if not employee:
+        employee = db.query(Employee).filter(Employee.company_id == user.company_id, Employee.work_email == user.email).first()
     log = _today_log(db, user, today)
     if not log:
         log = AttendanceLog(
@@ -290,16 +308,16 @@ def check_in(db: Session = Depends(get_db), user: User = Depends(current_user)):
             source="web",
         )
         db.add(log)
-        _apply_metrics(db, log, user)
+        _apply_metrics(db, log, user, employee)
         db.commit()
     elif not log.check_out_at:
         log.check_out_at = now
-        _apply_metrics(db, log, user)
+        _apply_metrics(db, log, user, employee)
         db.commit()
     else:
         log.check_in_at = now
         log.check_out_at = None
         log.status = ATT_PRESENT
-        _apply_metrics(db, log, user)
+        _apply_metrics(db, log, user, employee)
         db.commit()
     return _overview_payload(db, user)
