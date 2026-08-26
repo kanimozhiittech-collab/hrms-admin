@@ -37,7 +37,7 @@ function fmtHM(totalMinutes: number): string {
 }
 
 function fmtHoursHM(hours?: number | null) {
-  if (hours == null) return "—";
+  if (!hours) return "—";
   return fmtHM(Math.round(hours * 60));
 }
 
