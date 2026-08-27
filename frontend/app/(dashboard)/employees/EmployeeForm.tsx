@@ -34,8 +34,8 @@ const schema = z.object({
   // Contact
   work_email: z.string().email("Invalid email"),
   personal_email: z.string().email().optional().or(z.literal("")),
-  mobile: z.string().min(1, "Required"),
-  alt_phone: z.string().optional().or(z.literal("")),
+  mobile: z.string().min(1, "Required").regex(/^[^a-zA-Z]*$/, "Letters are not allowed"),
+  alt_phone: z.string().optional().or(z.literal("")).refine(v => !v || /^[^a-zA-Z]*$/.test(v), { message: "Letters are not allowed" }),
   password: z.string().min(6, "At least 6 characters").optional().or(z.literal("")),
   // Job
   department_id: z.string().min(1, "Required"),
@@ -194,18 +194,35 @@ export function employeeToFormValues(e: any): EmployeeFormValues {
 
 /* ---------- Field helpers ---------- */
 function Field({ label, error, children }: any) {
+  const required = typeof label === "string" && label.trim().endsWith("*");
+  const labelText = required ? label.trim().slice(0, -1).trim() : label;
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>{children}
+      <Label>{labelText}{required && <span className="text-red-600"> *</span>}</Label>{children}
       {error && <p className="text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }
 
-function TextField({ name, label, type = "text", placeholder, disabled, min, max }: any) {
-  const { register, formState: { errors } } = useFormContext();
+function TextField({ name, label, type = "text", placeholder, disabled, min, max, blockAlpha }: any) {
+  const { register, formState: { errors }, setValue } = useFormContext();
   const err = (errors as any)[name]?.message;
-  return <Field label={label} error={err}><Input type={type} placeholder={placeholder} disabled={disabled} min={min} max={max} {...register(name)}/></Field>;
+  const field = register(name);
+  return (
+    <Field label={label} error={err}>
+      <Input
+        type={type}
+        placeholder={placeholder}
+        disabled={disabled}
+        min={min}
+        max={max}
+        {...field}
+        onChange={blockAlpha ? (e: any) => {
+          setValue(name, e.target.value.replace(/[a-zA-Z]/g, ""), { shouldValidate: true });
+        } : field.onChange}
+      />
+    </Field>
+  );
 }
 
 function SelectField({ name, label, children }: any) {
@@ -491,8 +508,8 @@ export function EmployeeForm({
                   <div className="grid md:grid-cols-2 gap-4">
                     <TextField name="work_email" label="Work Email *" type="email"/>
                     <TextField name="personal_email" label="Personal Email" type="email"/>
-                    <TextField name="mobile" label="Mobile *" placeholder="+91 …"/>
-                    <TextField name="alt_phone" label="Alternate Phone"/>
+                    <TextField name="mobile" label="Mobile *" placeholder="+91 …" blockAlpha/>
+                    <TextField name="alt_phone" label="Alternate Phone" blockAlpha/>
                     <div>
                       <PasswordField
                         name="password"
