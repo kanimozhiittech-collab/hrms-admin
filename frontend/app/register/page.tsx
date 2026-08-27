@@ -1,42 +1,42 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, CheckCircle2, Users } from "lucide-react";
+import { Building2, CheckCircle2 } from "lucide-react";
 import { superadmin, type Plan } from "@/lib/superadmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-function parseModules(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function RegisterPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [planId, setPlanId] = useState<number | null>(null);
+  // No plan picker here — a self-registered company starts on the default
+  // (cheapest active) plan; the Super Admin can change it after approval.
+  const [defaultPlanId, setDefaultPlanId] = useState<number | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [panNumber, setPanNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [locations, setLocations] = useState("");
   const [loading, setLoading] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   useEffect(() => {
     superadmin.listPlans()
-      .then((list) => setPlans(list.filter((p) => p.status === "active")))
+      .then((list) => {
+        const active = list.filter((p) => p.status === "active");
+        const cheapest = active.sort((a, b) => Number(a.monthly_price) - Number(b.monthly_price))[0];
+        if (cheapest) setDefaultPlanId(cheapest.id);
+        else toast.error("No plan is available for registration — contact support.");
+      })
       .catch((err) => toast.error(err.message || "Failed to load plans"));
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (planId === null) { toast.error("Please select a plan"); return; }
+    if (defaultPlanId === null) { toast.error("No plan is available for registration — contact support."); return; }
     setLoading(true);
     try {
       const result = await superadmin.registerCompany({
@@ -44,7 +44,11 @@ export default function RegisterPage() {
         admin_name: adminName,
         admin_email: adminEmail,
         phone: phone || null,
-        plan_id: planId,
+        plan_id: defaultPlanId,
+        gst_number: gstNumber || null,
+        pan_number: panNumber || null,
+        address: address || null,
+        locations: locations || null,
       });
       setTempPassword(result.temp_password);
     } catch (err: any) {
@@ -86,7 +90,7 @@ export default function RegisterPage() {
         </div>
         <div>
           <h1 className="text-4xl font-bold leading-tight">Get your team<br/>set up in minutes.</h1>
-          <p className="mt-4 text-brand-100 max-w-md">Pick a plan, register your company, and start managing employees, attendance and leave right away.</p>
+          <p className="mt-4 text-brand-100 max-w-md">Register your company and start managing employees, attendance and leave right away.</p>
         </div>
         <div className="text-sm text-brand-200">© {new Date().getFullYear()} HRMS</div>
       </div>
@@ -95,41 +99,7 @@ export default function RegisterPage() {
         <form onSubmit={onSubmit} className="w-full max-w-lg space-y-6">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">Register your company</h2>
-            <p className="text-sm text-slate-500 mt-1">Choose a plan and submit — we&apos;ll activate your account after review.</p>
-          </div>
-
-          <div>
-            <Label>Select a plan</Label>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              {plans.map((p) => (
-                <button
-                  type="button"
-                  key={p.id}
-                  onClick={() => setPlanId(p.id)}
-                  className={`rounded-lg border p-3 text-left transition ${
-                    planId === p.id
-                      ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-900">{p.plan_name}</span>
-                    {planId === p.id && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
-                  </div>
-                  <p className="mt-1 text-lg font-semibold text-slate-900">
-                    ₹{Number(p.monthly_price).toLocaleString()}
-                    <span className="text-xs font-normal text-slate-400"> /month</span>
-                  </p>
-                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                    <Users className="h-3 w-3" />
-                    Up to {p.max_employees >= 999999 ? "unlimited" : p.max_employees.toLocaleString()} employees
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-slate-400">
-                    {parseModules(p.included_modules).slice(0, 4).join(" · ")}
-                  </p>
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-slate-500 mt-1">Tell us about your company and we&apos;ll activate your account right away.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -143,11 +113,33 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="adminEmail">Admin email</Label>
-              <Input id="adminEmail" type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="senthil@company.com" />
+              <Input id="adminEmail" type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value.toLowerCase())} placeholder="senthil@company.com" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone (optional)</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9876543210" />
+              <Label htmlFor="phone">Phone (10 digits)</Label>
+              <Input
+                id="phone" required type="tel" inputMode="numeric" maxLength={10}
+                pattern="\d{10}" title="Enter exactly 10 digits"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                placeholder="9876543210"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="gstNumber">GST Number (optional)</Label>
+              <Input id="gstNumber" value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="22AAAAA0000A1Z5" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="panNumber">PAN Number (optional)</Label>
+              <Input id="panNumber" value={panNumber} onChange={(e) => setPanNumber(e.target.value)} placeholder="AAAAA0000A" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="address">Address (optional)</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Company address" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="locations">Locations (optional)</Label>
+              <Input id="locations" value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Chennai, Coimbatore, Bengaluru" />
             </div>
           </div>
 

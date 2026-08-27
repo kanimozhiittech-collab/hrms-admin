@@ -16,6 +16,10 @@ export interface CompanyRegisterInput {
   admin_email: string;
   phone?: string | null;
   plan_id: number;
+  gst_number?: string | null;
+  pan_number?: string | null;
+  address?: string | null;
+  locations?: string | null;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -24,8 +28,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) },
   });
   if (!res.ok) {
-    let msg = res.statusText;
-    try { const j = await res.json(); msg = j.detail || msg; } catch {}
+    // HTTP/2 (which Vercel serves over) has no reason phrase, so statusText
+    // is always "" there — without this fallback, a non-JSON error response
+    // leaves msg as an empty string, and the resulting toast shows blank.
+    let msg = res.statusText || `Request failed (${res.status})`;
+    try {
+      const j = await res.json();
+      // FastAPI's own validation errors (422) come back as detail: [{loc, msg}, ...]
+      // rather than a plain string — join those into something readable.
+      msg = Array.isArray(j.detail)
+        ? j.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
+        : j.detail || msg;
+    } catch {}
+    if (!msg) msg = `Request failed (${res.status})`;
     throw new Error(msg);
   }
   return res.json();
