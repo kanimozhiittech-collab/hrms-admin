@@ -54,6 +54,22 @@ def _name_map(db: Session, company_id: str) -> dict:
     return {e.id: _emp_name(e) for e in rows}
 
 
+def _user_display(user: User) -> str:
+    return user.email.split("@")[0].replace(".", " ").replace("_", " ").title()
+
+
+def _user_name_map(db: Session, company_id: str) -> dict:
+    """Attendance logs always have a user_id, but not always an employee_id —
+    e.g. a Company Admin who checks in without ever being added as an Employee.
+    Falls back to this map so those rows show a name instead of blank."""
+    rows = db.query(User).filter(User.company_id == company_id).all()
+    return {u.id: _user_display(u) for u in rows}
+
+
+def _log_name(log: AttendanceLog, emp_names: dict, user_names: dict) -> Optional[str]:
+    return emp_names.get(log.employee_id) or user_names.get(log.user_id)
+
+
 def _log_to_out(log: AttendanceLog, name: Optional[str]) -> AttendanceLogOut:
     return AttendanceLogOut(
         id=log.id,
@@ -191,7 +207,8 @@ def all_attendance(
     logs = q.all()
 
     names = _name_map(db, user.company_id)
-    out = [_log_to_out(l, names.get(l.employee_id)) for l in logs]
+    user_names = _user_name_map(db, user.company_id)
+    out = [_log_to_out(l, _log_name(l, names, user_names)) for l in logs]
 
     if department_id:
         dept_emp_ids = {
@@ -230,6 +247,7 @@ def attendance_report(
         .all()
     )
     names = _name_map(db, user.company_id)
+    user_names = _user_name_map(db, user.company_id)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -239,7 +257,7 @@ def attendance_report(
     ])
     for l in logs:
         writer.writerow([
-            names.get(l.employee_id) or "",
+            _log_name(l, names, user_names) or "",
             l.work_date.isoformat(),
             l.status,
             l.check_in_at.strftime("%H:%M") if l.check_in_at else "",
