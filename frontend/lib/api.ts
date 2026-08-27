@@ -22,7 +22,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
-    let msg = res.statusText;
+    // HTTP/2 (which Vercel serves over) has no reason phrase, so statusText
+    // is always "" there — without this fallback, a non-JSON error response
+    // (a platform crash/timeout page, not our own JSON error) leaves msg as
+    // an empty string, and the resulting toast shows as a blank bar.
+    let msg = res.statusText || `Request failed (${res.status})`;
     try {
       const j = await res.json();
       // FastAPI's own validation errors (422) come back as detail: [{loc, msg}, ...]
@@ -31,6 +35,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         ? j.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
         : j.detail || msg;
     } catch {}
+    if (!msg) msg = `Request failed (${res.status})`;
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
@@ -46,7 +51,11 @@ async function downloadFile(path: string, filename: string): Promise<void> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { headers });
   if (!res.ok) {
-    let msg = res.statusText;
+    // HTTP/2 (which Vercel serves over) has no reason phrase, so statusText
+    // is always "" there — without this fallback, a non-JSON error response
+    // (a platform crash/timeout page, not our own JSON error) leaves msg as
+    // an empty string, and the resulting toast shows as a blank bar.
+    let msg = res.statusText || `Request failed (${res.status})`;
     try {
       const j = await res.json();
       // FastAPI's own validation errors (422) come back as detail: [{loc, msg}, ...]
@@ -55,6 +64,7 @@ async function downloadFile(path: string, filename: string): Promise<void> {
         ? j.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
         : j.detail || msg;
     } catch {}
+    if (!msg) msg = `Request failed (${res.status})`;
     throw new Error(msg);
   }
   const blob = await res.blob();
