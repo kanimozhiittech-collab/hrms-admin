@@ -1083,7 +1083,7 @@ function WidgetFilterMenu({ hidden, onToggle }: { hidden: Set<string>; onToggle:
   );
 }
 
-function DashboardWidgets() {
+function DashboardWidgets({ role }: { role: string | null }) {
   const [fileTab, setFileTab] = useState<"organization" | "employee">("organization");
   const [orgFiles, setOrgFiles] = useState<any[]>([]);
   const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
@@ -1091,6 +1091,11 @@ function DashboardWidgets() {
   const [newHires, setNewHires] = useState<any[]>([]);
   const [birthdaysToday, setBirthdaysToday] = useState<any[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // These are personal-to-an-employee widgets (my leave balance, my tasks, my
+  // pay, my surveys) — meaningless for an admin login with no Employee record
+  // of their own. Only hide once the role is actually confirmed as admin, so
+  // the common employee case never sees a hide-then-show flash while loading.
+  const hideForAdmin = role !== null && ADMIN_ROLES.includes(role);
 
   function loadWidgetData() {
     api.listFiles().then(setOrgFiles).catch(() => {});
@@ -1203,13 +1208,13 @@ function DashboardWidgets() {
         </WidgetCard>
         )}
 
-        {!hidden.has("Lop Summary") && (
+        {!hideForAdmin && !hidden.has("Lop Summary") && (
         <WidgetCard title="Lop Summary" icon={CalendarMinus}>
           <EmptyState text="No pay period is configured" />
         </WidgetCard>
         )}
 
-        {!hidden.has("Leave Report") && (
+        {!hideForAdmin && !hidden.has("Leave Report") && (
         <WidgetCard title="Leave Report" icon={CalendarCheck}>
           <div className="grid flex-1 grid-cols-3 gap-3">
             {[
@@ -1249,7 +1254,7 @@ function DashboardWidgets() {
         </WidgetCard>
         )}
 
-        {!hidden.has("My Pending Tasks") && (
+        {!hideForAdmin && !hidden.has("My Pending Tasks") && (
         <WidgetCard title="My Pending Tasks" icon={ListChecks} right={<Badge>0</Badge>}>
           <EmptyState text="There are no tasks available" />
         </WidgetCard>
@@ -1323,7 +1328,7 @@ function DashboardWidgets() {
         </WidgetCard>
         )}
 
-        {!hidden.has("Employee Engagement") && (
+        {!hideForAdmin && !hidden.has("Employee Engagement") && (
         <WidgetCard
           title="Employee Engagement"
           icon={HeartPulse}
@@ -1532,7 +1537,7 @@ function DashboardPageInner() {
                 </ContentCard>
               )
             )}
-            {mainTab === "dashboard" && <DashboardWidgets />}
+            {mainTab === "dashboard" && <DashboardWidgets role={role} />}
             {mainTab === "calendar" && <CalendarPanel />}
           </div>
         </main>
