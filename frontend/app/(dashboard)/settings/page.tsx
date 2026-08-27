@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal, ModalField } from "@/components/ui/modal";
 import { api, fileUrl } from "@/lib/api";
+import { INDIA_STATE_DISTRICTS } from "@/lib/india-states-districts";
 import { cn } from "@/lib/utils";
 import {
   Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye, Search,
@@ -524,16 +525,7 @@ const BLANK_LOCATION = {
   description: "",
 };
 
-const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
-  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
-  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
-  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-  "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Andaman and Nicobar Islands", "Chandigarh",
-  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
-  "Ladakh", "Lakshadweep", "Puducherry",
-];
+const INDIAN_STATES = Object.keys(INDIA_STATE_DISTRICTS);
 
 function LocationsService() {
   const isAdmin = useIsAdmin();
@@ -662,23 +654,32 @@ function LocationsService() {
               <ModalField label="Address Line 2">
                 <Input placeholder="Optional" value={form.address_line2} onChange={e => setForm(f => ({ ...f, address_line2: e.target.value }))}/>
               </ModalField>
-              <ModalField label="City">
-                <Input placeholder="Optional" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}/>
-              </ModalField>
               <div className="grid grid-cols-2 gap-4">
-                <ModalField label="Country">
-                  <Input placeholder="Optional" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}/>
-                </ModalField>
                 <ModalField label="State">
-                  <Select value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))}>
+                  <Select value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value, city: "" }))}>
                     <option value="">Select</option>
                     {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                   </Select>
                 </ModalField>
+                <ModalField label="District">
+                  <Select
+                    value={form.city}
+                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                    disabled={!form.state}
+                  >
+                    <option value="">{form.state ? "Select" : "Select a state first"}</option>
+                    {(INDIA_STATE_DISTRICTS[form.state] || []).map(d => <option key={d} value={d}>{d}</option>)}
+                  </Select>
+                </ModalField>
               </div>
-              <ModalField label="Postal Code">
-                <Input placeholder="Optional" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))}/>
-              </ModalField>
+              <div className="grid grid-cols-2 gap-4">
+                <ModalField label="Country">
+                  <Input placeholder="Optional" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}/>
+                </ModalField>
+                <ModalField label="Postal Code">
+                  <Input placeholder="Optional" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))}/>
+                </ModalField>
+              </div>
             </div>
           </div>
         </Modal>
