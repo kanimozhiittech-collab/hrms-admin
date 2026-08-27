@@ -9,3 +9,6 @@ class ProvisionCompanyIn(BaseModel):
     admin_email: EmailStr
     phone: Optional[str] = None
     temp_password: str
+
+class ResetAdminPasswordIn(BaseModel):
+    new_password: str

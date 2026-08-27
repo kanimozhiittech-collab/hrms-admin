@@ -8,7 +8,7 @@ from ..core.config import settings
 from ..core.security import hash_password
 from ..database import get_db
 from ..models import Company, Employee, Shift, User, WorkLocation
-from ..schemas import ProvisionCompanyIn
+from ..schemas import ProvisionCompanyIn, ResetAdminPasswordIn
 from ..seed import _add_holidays, _add_leave_types
 
 router = APIRouter(prefix="/api/provisioning", tags=["provisioning"])
@@ -58,6 +58,22 @@ def provision_company(body: ProvisionCompanyIn, db: Session = Depends(get_db)):
     db.add(admin)
     db.commit()
     return {"status": "created", "company_id": company.id}
+
+
+@router.put("/companies/{super_admin_company_id}/admin-password", dependencies=[Depends(_require_provision_secret)])
+def reset_admin_password(super_admin_company_id: int, body: ResetAdminPasswordIn, db: Session = Depends(get_db)):
+    """Called by the Super Admin app when it resets a company admin's
+    password, so the change actually takes effect here — the tenant's login
+    lives in this database, not the Super Admin's own copy of the User row."""
+    company = db.query(Company).filter(Company.super_admin_company_id == super_admin_company_id).first()
+    if not company:
+        raise HTTPException(404, "Company not found")
+    admin = db.query(User).filter(User.company_id == company.id, User.role == "company_admin").first()
+    if not admin:
+        raise HTTPException(404, "Company admin login not found")
+    admin.password_hash = hash_password(body.new_password)
+    db.commit()
+    return {"status": "updated", "email": admin.email}
 
 
 @router.delete("/companies", dependencies=[Depends(_require_provision_secret)])
