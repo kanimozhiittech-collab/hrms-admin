@@ -136,6 +136,22 @@ const TAB_OF_FIELD: Record<string, string> = {
   education: "background", experience: "background",
 };
 
+/** Walks react-hook-form's (possibly nested/array) error tree to the first
+ * leaf, returning a dot-path like "addresses.1.line1" matching the `name`
+ * attribute on the actual input — so it can be found and scrolled to. */
+function firstErrorPath(errors: any, prefix = ""): string | null {
+  if (!errors || typeof errors !== "object") return null;
+  for (const key of Object.keys(errors)) {
+    const val = errors[key];
+    if (!val || typeof val !== "object") continue;
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof val.message === "string") return path;
+    const nested = firstErrorPath(val, path);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 const NATIONALITIES = [
   "Afghan","Albanian","Algerian","American","Andorran","Angolan","Argentine","Armenian","Australian","Austrian",
   "Azerbaijani","Bahamian","Bahraini","Bangladeshi","Barbadian","Belarusian","Belgian","Belizean","Beninese","Bhutanese",
@@ -441,6 +457,17 @@ export function EmployeeForm({
     const targetTab = firstErrorKey && TAB_OF_FIELD[firstErrorKey];
     if (targetTab && targetTab !== tab) setTab(targetTab);
     toast.error("Please fix the highlighted fields");
+    // The error can be several fields deep (e.g. addresses.1.line1 for the
+    // Permanent Address block) — without this it's easy to land on the right
+    // tab but not see the actual red text without scrolling to hunt for it.
+    const path = firstErrorPath(errors);
+    if (path) {
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(`[name="${path}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.focus();
+      }, 100);
+    }
   }
 
   const { errors: formErrors } = methods.formState;
