@@ -41,6 +41,7 @@ class LeaveTypeOut(BaseModel):
 
 # ── Leave approval configuration ──
 class LeaveApprovalConfigIn(BaseModel):
+    module: str = "Leave"  # Leave | Regularization
     department_id: str
     approval_type: str = "single_level"  # single_level | two_level
     level1_employee_id: str

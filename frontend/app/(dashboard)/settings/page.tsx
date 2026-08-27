@@ -1120,10 +1120,10 @@ function LeaveTrackerService() {
 }
 
 const BLANK_APPROVAL_CONFIG = {
-  department_id: "", approval_type: "single_level", level1_employee_id: "", level2_employee_id: "", status: "active",
+  module: "Leave", department_id: "", approval_type: "single_level", level1_employee_id: "", level2_employee_id: "", status: "active",
 };
 
-function LeaveApprovalService() {
+function ApprovalConfigService() {
   const isAdmin = useIsAdmin();
   const employees = useEmployeeOptions();
   const [departments, setDepartments] = useState<any[]>([]);
@@ -1157,7 +1157,7 @@ function LeaveApprovalService() {
 
   function startEdit(c: any) {
     setForm({
-      department_id: c.department_id, approval_type: c.approval_type,
+      module: c.module, department_id: c.department_id, approval_type: c.approval_type,
       level1_employee_id: c.level1_employee_id, level2_employee_id: c.level2_employee_id || "",
       status: c.status,
     });
@@ -1198,7 +1198,7 @@ function LeaveApprovalService() {
         {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
         {!loading && items.length === 0 && (
           <div className="px-4 py-10 text-center text-sm text-slate-400">
-            No approval configurations yet — leave requests fall back to each employee's reporting manager.
+            No approval configurations yet — requests fall back to each employee's reporting manager.
           </div>
         )}
         {items.map(c => (
@@ -1206,6 +1206,7 @@ function LeaveApprovalService() {
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">
                 {c.department_name}
+                <span className="ml-2 text-xs text-slate-500">{c.module}</span>
                 <span className="ml-2 text-xs text-slate-400">{c.approval_type === "two_level" ? "Two Level" : "Single Level"}</span>
                 {c.status === "inactive" && <span className="ml-2 text-xs text-amber-600">Inactive</span>}
               </div>
@@ -1240,8 +1241,11 @@ function LeaveApprovalService() {
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
           </>}
         >
-          <ModalField label="Module">
-            <Input value="Leave" disabled/>
+          <ModalField label="Module *">
+            <Select value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))}>
+              <option value="Leave">Leave</option>
+              <option value="Regularization">Regularization</option>
+            </Select>
           </ModalField>
           <ModalField label="Department *">
             <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
@@ -1274,9 +1278,9 @@ function LeaveApprovalService() {
             </ModalField>
           </div>
           <p className="text-[11px] text-slate-400 -mt-2">
-            Leave requests from this department normally go to Level 1. If Level 1
-            has an approved leave covering today, they automatically route to
-            Level 2 instead.
+            {form.module} requests from this department normally go to Level 1.
+            If Level 1 has an approved leave covering today, they automatically
+            route to Level 2 instead.
           </p>
           <ModalField label="Status">
             <Select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
@@ -1298,7 +1302,7 @@ function EmployeeInformationService() {
         <TabsTrigger value="departments">Departments</TabsTrigger>
         <TabsTrigger value="designations">Designations</TabsTrigger>
         <TabsTrigger value="locations">Work Locations</TabsTrigger>
-        <TabsTrigger value="leave-approval">Leave Approval</TabsTrigger>
+        <TabsTrigger value="approval-config">Approval Configuration</TabsTrigger>
       </TabsList>
       <TabsContent value="organization">
         <OrganizationDetailsService />
@@ -1312,8 +1316,8 @@ function EmployeeInformationService() {
       <TabsContent value="locations">
         <LocationsService />
       </TabsContent>
-      <TabsContent value="leave-approval">
-        <LeaveApprovalService />
+      <TabsContent value="approval-config">
+        <ApprovalConfigService />
       </TabsContent>
     </Tabs>
   );

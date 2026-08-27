@@ -73,12 +73,13 @@ class LeaveBalance(Base):
 
 
 class LeaveApprovalConfig(Base):
-    """Per-department leave approval routing. Level 1 is the normal approver;
-    if they're on approved leave today, review responsibility automatically
-    shifts to Level 2 instead (only when approval_type is two_level)."""
+    """Per-department, per-module approval routing (Leave and Regularization
+    share this table). Level 1 is the normal approver; if they're on approved
+    leave today, review responsibility automatically shifts to Level 2
+    instead (only when approval_type is two_level)."""
     __tablename__ = "leave_approval_configs"
     __table_args__ = (
-        UniqueConstraint("company_id", "department_id", name="uq_approval_config_company_dept"),
+        UniqueConstraint("company_id", "module", "department_id", name="uq_approval_config_company_module_dept"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)

@@ -18,6 +18,7 @@ from ..schemas.attendance import (
     AttendanceLogOut, AttendanceSummary, RegularizationIn, RegularizationOut,
     RegularizationReview,
 )
+from ..core.approvals import MODULE_REGULARIZATION, configured_department_ids_for, current_approver_employee_id
 from ..core.worktime import is_weekend
 from .deps import current_user
 
@@ -41,6 +42,25 @@ def _resolve_employee(db: Session, user: User) -> Employee | None:
             Employee.company_id == user.company_id, Employee.work_email == user.email
         ).first()
     return emp
+
+
+def _own_employee_id(db: Session, user: User) -> Optional[str]:
+    emp = _resolve_employee(db, user)
+    return emp.id if emp else None
+
+
+def _can_review_regularization(db: Session, user: User, reg: RegularizationRequest) -> bool:
+    """HR can review anyone's request. Otherwise, only the request's current
+    approver (the department's configured Level 1 — or Level 2 if Level 1 is
+    on approved leave today — falling back to the plain reporting manager
+    when no department config exists) may approve/reject it."""
+    if _is_hr(user):
+        return True
+    my_emp_id = _own_employee_id(db, user)
+    if not my_emp_id:
+        return False
+    target = db.query(Employee).filter(Employee.id == reg.employee_id).first()
+    return current_approver_employee_id(db, reg.company_id, target, MODULE_REGULARIZATION) == my_emp_id
 
 
 def _emp_name(emp: Employee | None) -> Optional[str]:
@@ -321,7 +341,24 @@ def list_regularizations(
     )
     if scope == "team":
         if not _is_hr(user):
-            raise HTTPException(status_code=403, detail="Not authorized")
+            my_emp_id = _own_employee_id(db, user)
+            reviewable_ids = set()
+            if my_emp_id:
+                reviewable_ids.update(
+                    e.id for e in db.query(Employee.id)
+                    .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
+                    .all()
+                )
+                configured_dept_ids = configured_department_ids_for(db, user.company_id, my_emp_id, MODULE_REGULARIZATION)
+                if configured_dept_ids:
+                    reviewable_ids.update(
+                        e.id for e in db.query(Employee.id)
+                        .filter(Employee.company_id == user.company_id, Employee.department_id.in_(configured_dept_ids))
+                        .all()
+                    )
+            if not reviewable_ids:
+                raise HTTPException(status_code=403, detail="Not authorized")
+            q = q.filter(RegularizationRequest.employee_id.in_(reviewable_ids))
     else:
         q = q.filter(RegularizationRequest.user_id == user.id)
     regs = q.order_by(RegularizationRequest.created_at.desc()).all()
@@ -373,14 +410,14 @@ def approve_regularization(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if not _is_hr(user):
-        raise HTTPException(status_code=403, detail="Not authorized")
     reg = db.query(RegularizationRequest).filter(
         RegularizationRequest.id == reg_id,
         RegularizationRequest.company_id == user.company_id,
     ).first()
     if not reg:
         raise HTTPException(status_code=404, detail="Request not found")
+    if not _can_review_regularization(db, user, reg):
+        raise HTTPException(status_code=403, detail="Not authorized")
     if reg.status != "pending":
         raise HTTPException(status_code=400, detail="Request already reviewed")
     reg.status = "approved"
@@ -407,14 +444,14 @@ def reject_regularization(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if not _is_hr(user):
-        raise HTTPException(status_code=403, detail="Not authorized")
     reg = db.query(RegularizationRequest).filter(
         RegularizationRequest.id == reg_id,
         RegularizationRequest.company_id == user.company_id,
     ).first()
     if not reg:
         raise HTTPException(status_code=404, detail="Request not found")
+    if not _can_review_regularization(db, user, reg):
+        raise HTTPException(status_code=403, detail="Not authorized")
     if reg.status != "pending":
         raise HTTPException(status_code=400, detail="Request already reviewed")
     reg.status = "rejected"

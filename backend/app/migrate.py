@@ -117,3 +117,25 @@ def run_migrations():
                 if col in meta and not meta[col].get("nullable", True):
                     conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {col} DROP NOT NULL"))
                     print(f"[migrate] dropped NOT NULL on {table}.{col}")
+
+        # leave_approval_configs' uniqueness widened from (company_id,
+        # department_id) to (company_id, module, department_id) so Leave and
+        # Regularization can each have their own config for the same
+        # department. Checked via pg_constraint so this is safe to re-run.
+        if is_postgres and "leave_approval_configs" in existing_tables:
+            constraint_names = {
+                row[0] for row in conn.execute(text(
+                    "SELECT conname FROM pg_constraint WHERE conrelid = 'leave_approval_configs'::regclass"
+                ))
+            }
+            if "uq_approval_config_company_dept" in constraint_names:
+                conn.execute(text(
+                    "ALTER TABLE leave_approval_configs DROP CONSTRAINT uq_approval_config_company_dept"
+                ))
+                print("[migrate] dropped uq_approval_config_company_dept")
+            if "uq_approval_config_company_module_dept" not in constraint_names:
+                conn.execute(text(
+                    "ALTER TABLE leave_approval_configs ADD CONSTRAINT "
+                    "uq_approval_config_company_module_dept UNIQUE (company_id, module, department_id)"
+                ))
+                print("[migrate] added uq_approval_config_company_module_dept")
