@@ -412,18 +412,26 @@ export function EmployeeForm({
     }
   }
 
+  /** A file upload failing here (network blip, large file) shouldn't be
+   * reported as if the employee record itself failed to save — it already
+   * exists at this point. Surface it as a separate warning instead. */
+  async function uploadPendingFilesSafely(res: any) {
+    try { await uploadPendingFiles(res); }
+    catch (e: any) { toast.error(`Saved, but a file upload failed: ${e.message}`); }
+  }
+
   async function onSubmit(values: EmployeeFormValues, saveAndNew = false) {
     const clean: any = { ...values };
     Object.keys(clean).forEach(k => { if (clean[k] === "") clean[k] = null; });
     try {
       if (mode === "edit" && employeeId) {
         const res = await api.updateEmployee(employeeId, clean);
-        await uploadPendingFiles(res);
+        await uploadPendingFilesSafely(res);
         toast.success(`${res.first_name} ${res.last_name} updated`);
         router.push(`/employees/${res.id}`);
       } else {
         const res = await api.createEmployee(clean);
-        await uploadPendingFiles(res);
+        await uploadPendingFilesSafely(res);
         if (linkUserId) {
           await api.updateUserProfile(linkUserId, { email: res.work_email, employee_id: res.id });
           toast.success(`${res.first_name} ${res.last_name} created and linked to the login account`);
@@ -441,7 +449,14 @@ export function EmployeeForm({
           router.push(`/employees/${res.id}`);
         }
       }
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      // The browser's own message for a dropped/failed request ("Failed to
+      // fetch") reads as a crash, not a "try again" — say what actually happened.
+      const msg = e.message === "Failed to fetch"
+        ? "Couldn't reach the server — check your connection and try again."
+        : e.message;
+      toast.error(msg);
+    }
   }
 
   const tabs = [
