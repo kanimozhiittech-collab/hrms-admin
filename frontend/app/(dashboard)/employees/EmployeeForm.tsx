@@ -117,6 +117,25 @@ const schema = z.object({
 
 export type EmployeeFormValues = z.infer<typeof schema>;
 
+/** Which tab each top-level schema field lives on — used to jump straight to
+ * the tab with an error on a failed save, since errors on a hidden tab are
+ * otherwise invisible (TabsContent unmounts inactive tabs). */
+const TAB_OF_FIELD: Record<string, string> = {
+  emp_code: "profile", prefix: "profile", first_name: "profile", middle_name: "profile", last_name: "profile",
+  display_name: "profile", gender: "profile", date_of_birth: "profile", blood_group: "profile",
+  marital_status: "profile", nationality: "profile", photo_url: "profile",
+  work_email: "profile", personal_email: "profile", mobile: "profile", alt_phone: "profile", password: "profile",
+  addresses: "profile", dependents: "profile", emergency_contacts: "profile",
+  department_id: "job", designation_id: "job", employee_type: "job", date_of_joining: "job",
+  probation_end_date: "job", confirmation_date: "job", reporting_manager_id: "job", work_location_id: "job",
+  shift_id: "job", source_of_hire: "job", tags: "job", status: "job", exit_date: "job",
+  ctc: "job", pay_frequency: "job", notes: "job",
+  bank_name: "job", bank_account_no: "job", bank_ifsc: "job", bank_branch: "job", bank_account_type: "job",
+  pan_number: "job", aadhaar_number: "job", uan_number: "job", pf_number: "job", esi_number: "job",
+  passport_number: "job", passport_expiry: "job",
+  education: "background", experience: "background",
+};
+
 const NATIONALITIES = [
   "Afghan","Albanian","Algerian","American","Andorran","Angolan","Argentine","Armenian","Australian","Austrian",
   "Azerbaijani","Bahamian","Bahraini","Bangladeshi","Barbadian","Belarusian","Belgian","Belizean","Beninese","Bhutanese",
@@ -415,11 +434,24 @@ export function EmployeeForm({
     ["background","Education & Experience"],
   ];
 
+  /** Jump to the tab holding the first invalid field, since a hidden tab's
+   * errors are otherwise invisible until the user happens to click over. */
+  function onInvalid(errors: any) {
+    const firstErrorKey = Object.keys(errors)[0];
+    const targetTab = firstErrorKey && TAB_OF_FIELD[firstErrorKey];
+    if (targetTab && targetTab !== tab) setTab(targetTab);
+    toast.error("Please fix the highlighted fields");
+  }
+
+  const { errors: formErrors } = methods.formState;
+  const tabHasError = (tabKey: string) =>
+    Object.keys(formErrors).some(k => TAB_OF_FIELD[k] === tabKey);
+
   return (
     <>
       <Topbar title={mode === "edit" ? "Edit Employee" : "New Employee"}/>
       <FormProvider {...methods}>
-        <form onSubmit={methods.handleSubmit(v => onSubmit(v, false))} className="p-4 lg:p-6 space-y-4">
+        <form onSubmit={methods.handleSubmit(v => onSubmit(v, false), onInvalid)} className="p-4 lg:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">{mode === "edit" ? "Edit Employee" : linkUserId ? "Create Employee Profile" : "Add Employee"}</h2>
@@ -432,7 +464,7 @@ export function EmployeeForm({
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={() => router.back()}><X className="h-4 w-4"/>Cancel</Button>
               {mode === "create" && !linkUserId && (
-                <Button type="button" variant="outline" onClick={methods.handleSubmit(v => onSubmit(v, true))}><Save className="h-4 w-4"/>Save & New</Button>
+                <Button type="button" variant="outline" onClick={methods.handleSubmit(v => onSubmit(v, true), onInvalid)}><Save className="h-4 w-4"/>Save & New</Button>
               )}
               <Button type="submit"><Save className="h-4 w-4"/>Save</Button>
             </div>
@@ -442,7 +474,12 @@ export function EmployeeForm({
             <CardContent>
               <Tabs value={tab} onValueChange={setTab} defaultValue="profile">
                 <TabsList>
-                  {tabs.map(([v,l]) => <TabsTrigger key={v} value={v}>{l}</TabsTrigger>)}
+                  {tabs.map(([v,l]) => (
+                    <TabsTrigger key={v} value={v}>
+                      {l}
+                      {tabHasError(v) && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="Has errors"/>}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
 
                 {/* PERSONAL, CONTACT & FAMILY */}
