@@ -9,7 +9,7 @@ from ..models import (Employee, EmployeeAddress, EducationRecord, ExperienceReco
                       Dependent, EmergencyContact, EmployeeDocument, Department, Designation, User,
                       LeaveBalance, LeaveRequest, Company)
 from ..models.attendance import AttendanceLog, RegularizationRequest
-from ..models.services import OrgFile
+from ..models.services import OrgFile, LetterRequest, HrTask, ExitDetail
 from ..schemas import EmployeeIn, EmployeeOut, EmployeeListResponse, EmployeeListItem, DocumentOut
 from ..core.security import hash_password
 from ..core.storage import save_upload
@@ -250,6 +250,9 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
     # manually linked from Manage Accounts) — clean up every one of them.
     logins = db.query(User).filter(User.employee_id == emp_id).all()
     db.query(Employee).filter(Employee.reporting_manager_id == emp_id).update({"reporting_manager_id": None})
+    db.query(Department).filter(Department.lead_id == emp_id).update({"lead_id": None})
+    db.query(HrTask).filter(HrTask.owner_id == emp_id).update({"owner_id": None})
+    db.query(ExitDetail).filter(ExitDetail.interviewer_id == emp_id).update({"interviewer_id": None})
     for login in logins:
         # This employee's login may have reviewed other people's leave/regularization
         # requests as a manager — detach those before the login row itself is deleted.
@@ -260,6 +263,8 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db), user: User = Dep
     db.query(RegularizationRequest).filter(RegularizationRequest.employee_id == emp_id).delete()
     db.query(LeaveRequest).filter(LeaveRequest.employee_id == emp_id).delete()
     db.query(LeaveBalance).filter(LeaveBalance.employee_id == emp_id).delete()
+    db.query(LetterRequest).filter(LetterRequest.employee_id == emp_id).delete()
+    db.query(ExitDetail).filter(ExitDetail.employee_id == emp_id).delete()
     for login in logins:
         db.delete(login)
         db.flush()  # SQLAlchemy won't auto-order this delete before the Employee's without a flush

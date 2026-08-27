@@ -23,7 +23,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let msg = res.statusText;
-    try { const j = await res.json(); msg = j.detail || msg; } catch {}
+    try {
+      const j = await res.json();
+      // FastAPI's own validation errors (422) come back as detail: [{loc, msg}, ...]
+      // rather than a plain string — join those into something readable.
+      msg = Array.isArray(j.detail)
+        ? j.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
+        : j.detail || msg;
+    } catch {}
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
@@ -40,7 +47,14 @@ async function downloadFile(path: string, filename: string): Promise<void> {
   const res = await fetch(`${BASE}${path}`, { headers });
   if (!res.ok) {
     let msg = res.statusText;
-    try { const j = await res.json(); msg = j.detail || msg; } catch {}
+    try {
+      const j = await res.json();
+      // FastAPI's own validation errors (422) come back as detail: [{loc, msg}, ...]
+      // rather than a plain string — join those into something readable.
+      msg = Array.isArray(j.detail)
+        ? j.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
+        : j.detail || msg;
+    } catch {}
     throw new Error(msg);
   }
   const blob = await res.blob();

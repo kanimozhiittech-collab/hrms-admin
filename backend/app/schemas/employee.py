@@ -1,6 +1,14 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from datetime import date
 from typing import Optional, List
+
+def _blank_to_none(data):
+    """The frontend sends "" for an untouched optional field (dates, numbers,
+    emails) rather than omitting it — Pydantic's typed Optional fields reject
+    "" outright (e.g. Optional[date] doesn't accept ""), so treat it as unset."""
+    if isinstance(data, dict):
+        return {k: (None if v == "" else v) for k, v in data.items()}
+    return data
 
 class AddressIn(BaseModel):
     address_type: str = Field(pattern="^(Present|Permanent)$")
@@ -22,6 +30,8 @@ class EducationIn(BaseModel):
     file_name: Optional[str] = None
     file_url: Optional[str] = None
 
+    _blank = model_validator(mode="before")(_blank_to_none)
+
 class ExperienceIn(BaseModel):
     id: Optional[str] = None
     company_name: Optional[str] = None
@@ -32,12 +42,16 @@ class ExperienceIn(BaseModel):
     file_name: Optional[str] = None
     file_url: Optional[str] = None
 
+    _blank = model_validator(mode="before")(_blank_to_none)
+
 class DependentIn(BaseModel):
     name: str
     relationship_type: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     is_dependent: bool = True
+
+    _blank = model_validator(mode="before")(_blank_to_none)
 
 class EmergencyIn(BaseModel):
     name: str
@@ -112,6 +126,8 @@ class EmployeeIn(BaseModel):
     experience: List[ExperienceIn] = []
     dependents: List[DependentIn] = []
     emergency_contacts: List[EmergencyIn] = []
+
+    _blank = model_validator(mode="before")(_blank_to_none)
 
 class EmployeeListItem(BaseModel):
     id: str
