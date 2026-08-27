@@ -1119,6 +1119,177 @@ function LeaveTrackerService() {
   );
 }
 
+const BLANK_APPROVAL_CONFIG = {
+  department_id: "", approval_type: "single_level", level1_employee_id: "", level2_employee_id: "", status: "active",
+};
+
+function LeaveApprovalService() {
+  const isAdmin = useIsAdmin();
+  const employees = useEmployeeOptions();
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(BLANK_APPROVAL_CONFIG);
+  const [saving, setSaving] = useState(false);
+
+  function empLabel(e: any) {
+    return `${e.emp_code ? `${e.emp_code} - ` : ""}${e.display_name || `${e.first_name} ${e.last_name}`}`;
+  }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [configs, depts] = await Promise.all([api.leaveApprovalConfigs(), api.departments()]);
+      setItems(configs);
+      setDepartments(depts);
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function resetForm() {
+    setForm(BLANK_APPROVAL_CONFIG);
+    setEditingId(null);
+  }
+
+  function startEdit(c: any) {
+    setForm({
+      department_id: c.department_id, approval_type: c.approval_type,
+      level1_employee_id: c.level1_employee_id, level2_employee_id: c.level2_employee_id || "",
+      status: c.status,
+    });
+    setEditingId(c.id);
+    setShowForm(true);
+  }
+
+  async function save() {
+    if (!form.department_id || !form.level1_employee_id) return;
+    if (form.approval_type === "two_level" && !form.level2_employee_id) return;
+    setSaving(true); setError("");
+    const payload = { ...form, level2_employee_id: form.level2_employee_id || null };
+    try {
+      if (editingId) await api.updateLeaveApprovalConfig(editingId, payload);
+      else await api.createLeaveApprovalConfig(payload);
+      resetForm(); setShowForm(false); await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this approval configuration?")) return;
+    setError("");
+    try { await api.deleteLeaveApprovalConfig(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm text-slate-500">{items.length} configuration{items.length === 1 ? "" : "s"}</div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="h-4 w-4" />Add Configuration
+        </Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-10 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">
+            No approval configurations yet — leave requests fall back to each employee's reporting manager.
+          </div>
+        )}
+        {items.map(c => (
+          <div key={c.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900">
+                {c.department_name}
+                <span className="ml-2 text-xs text-slate-400">{c.approval_type === "two_level" ? "Two Level" : "Single Level"}</span>
+                {c.status === "inactive" && <span className="ml-2 text-xs text-amber-600">Inactive</span>}
+              </div>
+              <div className="text-xs text-slate-500">
+                Level 1: {c.level1_employee_name || "—"}
+                {c.approval_type === "two_level" && ` · Level 2 (backup): ${c.level2_employee_name || "—"}`}
+              </div>
+            </div>
+            <button onClick={() => startEdit(c)} className="text-slate-400 hover:text-slate-700">
+              <Pencil className="h-3.5 w-3.5"/>
+            </button>
+            {isAdmin && (
+              <button onClick={() => remove(c.id)} className="text-slate-400 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5"/>
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title={editingId ? "Edit Approval Configuration" : "Add Approval Configuration"}
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button
+              onClick={save}
+              disabled={saving || !form.department_id || !form.level1_employee_id || (form.approval_type === "two_level" && !form.level2_employee_id)}
+            >
+              {saving ? "Saving…" : "Submit"}
+            </Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Module">
+            <Input value="Leave" disabled/>
+          </ModalField>
+          <ModalField label="Department *">
+            <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
+              <option value="">Select</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </Select>
+          </ModalField>
+          <ModalField label="Approval Type *">
+            <Select value={form.approval_type} onChange={e => setForm(f => ({ ...f, approval_type: e.target.value }))}>
+              <option value="single_level">Single Level</option>
+              <option value="two_level">Two Level</option>
+            </Select>
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Level 1 (Primary Approver) *">
+              <Select value={form.level1_employee_id} onChange={e => setForm(f => ({ ...f, level1_employee_id: e.target.value }))}>
+                <option value="">Select</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{empLabel(e)}</option>)}
+              </Select>
+            </ModalField>
+            <ModalField label={form.approval_type === "two_level" ? "Level 2 (Backup Approver) *" : "Level 2 (Backup Approver)"}>
+              <Select
+                value={form.level2_employee_id}
+                onChange={e => setForm(f => ({ ...f, level2_employee_id: e.target.value }))}
+                disabled={form.approval_type !== "two_level"}
+              >
+                <option value="">Select</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{empLabel(e)}</option>)}
+              </Select>
+            </ModalField>
+          </div>
+          <p className="text-[11px] text-slate-400 -mt-2">
+            Leave requests from this department normally go to Level 1. If Level 1
+            has an approved leave covering today, they automatically route to
+            Level 2 instead.
+          </p>
+          <ModalField label="Status">
+            <Select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </Select>
+          </ModalField>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
 function EmployeeInformationService() {
   return (
     <Tabs defaultValue="organization">
@@ -1127,6 +1298,7 @@ function EmployeeInformationService() {
         <TabsTrigger value="departments">Departments</TabsTrigger>
         <TabsTrigger value="designations">Designations</TabsTrigger>
         <TabsTrigger value="locations">Work Locations</TabsTrigger>
+        <TabsTrigger value="leave-approval">Leave Approval</TabsTrigger>
       </TabsList>
       <TabsContent value="organization">
         <OrganizationDetailsService />
@@ -1139,6 +1311,9 @@ function EmployeeInformationService() {
       </TabsContent>
       <TabsContent value="locations">
         <LocationsService />
+      </TabsContent>
+      <TabsContent value="leave-approval">
+        <LeaveApprovalService />
       </TabsContent>
     </Tabs>
   );

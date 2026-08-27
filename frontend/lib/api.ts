@@ -233,6 +233,13 @@ export const api = {
   createLeaveType: (data: any) => request<any>("/api/leave/types", { method: "POST", body: JSON.stringify(data) }),
   updateLeaveType: (id: string, data: any) =>
     request<any>(`/api/leave/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  leaveApprovalConfigs: () => request<any[]>("/api/leave/approval-config"),
+  createLeaveApprovalConfig: (data: any) =>
+    request<any>("/api/leave/approval-config", { method: "POST", body: JSON.stringify(data) }),
+  updateLeaveApprovalConfig: (id: string, data: any) =>
+    request<any>(`/api/leave/approval-config/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteLeaveApprovalConfig: (id: string) =>
+    request<void>(`/api/leave/approval-config/${id}`, { method: "DELETE" }),
   leaveBalance: (year?: number) => request<any[]>(`/api/leave/balance${year ? `?year=${year}` : ""}`),
   employeeLeaveBalance: (employeeId: string, year?: number) =>
     request<any[]>(`/api/leave/balance/${employeeId}${year ? `?year=${year}` : ""}`),

@@ -72,6 +72,27 @@ class LeaveBalance(Base):
         return round(self.allocated + self.carried_forward - self.used - self.pending, 2)
 
 
+class LeaveApprovalConfig(Base):
+    """Per-department leave approval routing. Level 1 is the normal approver;
+    if they're on approved leave today, review responsibility automatically
+    shifts to Level 2 instead (only when approval_type is two_level)."""
+    __tablename__ = "leave_approval_configs"
+    __table_args__ = (
+        UniqueConstraint("company_id", "department_id", name="uq_approval_config_company_dept"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True)
+    module: Mapped[str] = mapped_column(String(30), default="Leave")
+    department_id: Mapped[str] = mapped_column(ForeignKey("departments.id"), index=True)
+    approval_type: Mapped[str] = mapped_column(String(20), default="single_level")  # single_level | two_level
+    level1_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"))
+    level2_employee_id: Mapped[str | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="active")  # active | inactive
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class LeaveRequest(Base):
     __tablename__ = "leave_requests"
 

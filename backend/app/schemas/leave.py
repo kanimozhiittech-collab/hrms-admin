@@ -39,6 +39,31 @@ class LeaveTypeOut(BaseModel):
         from_attributes = True
 
 
+# ── Leave approval configuration ──
+class LeaveApprovalConfigIn(BaseModel):
+    department_id: str
+    approval_type: str = "single_level"  # single_level | two_level
+    level1_employee_id: str
+    level2_employee_id: Optional[str] = None
+    status: str = "active"
+
+
+class LeaveApprovalConfigOut(BaseModel):
+    id: str
+    module: str
+    department_id: str
+    department_name: Optional[str] = None
+    approval_type: str
+    level1_employee_id: str
+    level1_employee_name: Optional[str] = None
+    level2_employee_id: Optional[str] = None
+    level2_employee_name: Optional[str] = None
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
 # ── Leave balances ──
 class LeaveBalanceOut(BaseModel):
     id: str

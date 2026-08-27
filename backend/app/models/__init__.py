@@ -4,5 +4,5 @@ from .employee import (
     Dependent, EmergencyContact, EmployeeDocument
 )
 from .attendance import AttendanceLog, Holiday, RegularizationRequest
-from .leave import LeaveType, LeaveBalance, LeaveRequest
+from .leave import LeaveType, LeaveBalance, LeaveRequest, LeaveApprovalConfig
 from .services import OrgFile, LetterRequest, HrTask, ExitDetail, Meeting

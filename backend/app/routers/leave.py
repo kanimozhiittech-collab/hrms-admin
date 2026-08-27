@@ -1,17 +1,19 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 from typing import List, Optional
 
 from ..database import get_db
 from ..models import (
-    AttendanceLog, Employee, Holiday, LeaveBalance, LeaveRequest, LeaveType, User,
+    AttendanceLog, Department, Employee, Holiday, LeaveApprovalConfig, LeaveBalance,
+    LeaveRequest, LeaveType, User,
 )
 from ..models.attendance import ATT_ON_LEAVE, ATT_HALF_DAY
 from ..models.leave import LR_PENDING, LR_APPROVED, LR_REJECTED, LR_CANCELLED
 from ..schemas.leave import (
     LeaveTypeIn, LeaveTypeOut, LeaveBalanceOut, LeaveBalanceAdjustIn, LeaveRequestIn, LeaveRequestOut,
-    LeaveReview, LeaveCalendarItem,
+    LeaveReview, LeaveCalendarItem, LeaveApprovalConfigIn, LeaveApprovalConfigOut,
 )
 from ..core.worktime import working_days, iter_dates, is_weekend
 from ..core.storage import save_upload
@@ -31,19 +33,56 @@ def _own_employee_id(db: Session, user: User) -> Optional[str]:
     return emp.id if emp else None
 
 
+def _is_on_approved_leave_today(db: Session, employee_id: str) -> bool:
+    """Level 1 counts as "unavailable" when they themselves have an approved
+    leave request covering today — that's what triggers Level 2 failover."""
+    today = date.today()
+    return db.query(LeaveRequest).filter(
+        LeaveRequest.employee_id == employee_id,
+        LeaveRequest.status == LR_APPROVED,
+        LeaveRequest.from_date <= today,
+        LeaveRequest.to_date >= today,
+    ).first() is not None
+
+
+def _department_approval_config(db: Session, company_id: str, department_id: Optional[str]) -> Optional[LeaveApprovalConfig]:
+    if not department_id:
+        return None
+    return db.query(LeaveApprovalConfig).filter(
+        LeaveApprovalConfig.company_id == company_id,
+        LeaveApprovalConfig.department_id == department_id,
+        LeaveApprovalConfig.status == "active",
+    ).first()
+
+
+def _current_approver_employee_id(db: Session, req: LeaveRequest, target: Optional[Employee] = None) -> Optional[str]:
+    """Who should be reviewing this request right now. A department's
+    configured Level 1 is the normal approver; if Level 2 exists (two-level
+    approval) and Level 1 is on approved leave today, it shifts to Level 2.
+    Falls back to the employee's plain reporting manager when the
+    department has no approval config set up."""
+    target = target or db.query(Employee).filter(Employee.id == req.employee_id).first()
+    if not target:
+        return None
+    config = _department_approval_config(db, req.company_id, target.department_id)
+    if config:
+        if config.approval_type == "two_level" and config.level2_employee_id and _is_on_approved_leave_today(db, config.level1_employee_id):
+            return config.level2_employee_id
+        return config.level1_employee_id
+    return target.reporting_manager_id
+
+
 def _can_review(db: Session, user: User, req: LeaveRequest) -> bool:
-    """HR can review anyone's request; a reporting manager can review their own
-    reports'. Department Head is deliberately NOT a review path — only HR and
-    the employee's actual reporting manager should approve/reject leave."""
+    """HR can review anyone's request. Otherwise, only the request's current
+    approver (the department's configured Level 1 — or Level 2 if Level 1 is
+    on approved leave today — falling back to the plain reporting manager
+    when no department config exists) may approve/reject it."""
     if _is_hr(user):
         return True
     my_emp_id = _own_employee_id(db, user)
     if not my_emp_id:
         return False
-    target = db.query(Employee).filter(Employee.id == req.employee_id).first()
-    if not target:
-        return False
-    return target.reporting_manager_id == my_emp_id
+    return _current_approver_employee_id(db, req) == my_emp_id
 
 
 def _resolve_employee(db: Session, user: User) -> Employee | None:
@@ -185,6 +224,118 @@ def update_type(
     db.commit()
     db.refresh(lt)
     return lt
+
+
+# ──────────────────────────────────────────────
+# Leave approval configuration (per-department Level 1 / Level 2 routing)
+# ──────────────────────────────────────────────
+def _config_to_out(c: LeaveApprovalConfig, dept_names: dict, emp_names: dict) -> LeaveApprovalConfigOut:
+    return LeaveApprovalConfigOut(
+        id=c.id,
+        module=c.module,
+        department_id=c.department_id,
+        department_name=dept_names.get(c.department_id),
+        approval_type=c.approval_type,
+        level1_employee_id=c.level1_employee_id,
+        level1_employee_name=emp_names.get(c.level1_employee_id),
+        level2_employee_id=c.level2_employee_id,
+        level2_employee_name=emp_names.get(c.level2_employee_id) if c.level2_employee_id else None,
+        status=c.status,
+    )
+
+
+@router.get("/approval-config", response_model=List[LeaveApprovalConfigOut])
+def list_approval_configs(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if not _is_hr(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    rows = (
+        db.query(LeaveApprovalConfig)
+        .filter(LeaveApprovalConfig.company_id == user.company_id)
+        .order_by(LeaveApprovalConfig.created_at.desc())
+        .all()
+    )
+    dept_names = {d.id: d.name for d in db.query(Department).filter(Department.company_id == user.company_id).all()}
+    emp_names = _name_map(db, user.company_id)
+    return [_config_to_out(c, dept_names, emp_names) for c in rows]
+
+
+@router.post("/approval-config", response_model=LeaveApprovalConfigOut)
+def create_approval_config(
+    payload: LeaveApprovalConfigIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    if not _is_hr(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if payload.approval_type == "two_level" and not payload.level2_employee_id:
+        raise HTTPException(status_code=400, detail="Level 2 is required for two-level approval")
+
+    existing = db.query(LeaveApprovalConfig).filter(
+        LeaveApprovalConfig.company_id == user.company_id,
+        LeaveApprovalConfig.department_id == payload.department_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="This department already has an approval configuration")
+
+    config = LeaveApprovalConfig(company_id=user.company_id, module="Leave", **payload.model_dump())
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    dept_names = {d.id: d.name for d in db.query(Department).filter(Department.company_id == user.company_id).all()}
+    emp_names = _name_map(db, user.company_id)
+    return _config_to_out(config, dept_names, emp_names)
+
+
+@router.put("/approval-config/{config_id}", response_model=LeaveApprovalConfigOut)
+def update_approval_config(
+    config_id: str,
+    payload: LeaveApprovalConfigIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    if not _is_hr(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if payload.approval_type == "two_level" and not payload.level2_employee_id:
+        raise HTTPException(status_code=400, detail="Level 2 is required for two-level approval")
+
+    config = db.query(LeaveApprovalConfig).filter(
+        LeaveApprovalConfig.id == config_id, LeaveApprovalConfig.company_id == user.company_id
+    ).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Approval configuration not found")
+
+    dup = db.query(LeaveApprovalConfig).filter(
+        LeaveApprovalConfig.company_id == user.company_id,
+        LeaveApprovalConfig.department_id == payload.department_id,
+        LeaveApprovalConfig.id != config_id,
+    ).first()
+    if dup:
+        raise HTTPException(status_code=400, detail="This department already has an approval configuration")
+
+    for k, v in payload.model_dump().items():
+        setattr(config, k, v)
+    db.commit()
+    db.refresh(config)
+    dept_names = {d.id: d.name for d in db.query(Department).filter(Department.company_id == user.company_id).all()}
+    emp_names = _name_map(db, user.company_id)
+    return _config_to_out(config, dept_names, emp_names)
+
+
+@router.delete("/approval-config/{config_id}", status_code=204)
+def delete_approval_config(
+    config_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    if not _is_hr(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    config = db.query(LeaveApprovalConfig).filter(
+        LeaveApprovalConfig.id == config_id, LeaveApprovalConfig.company_id == user.company_id
+    ).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Approval configuration not found")
+    db.delete(config)
+    db.commit()
 
 
 # ──────────────────────────────────────────────
@@ -443,6 +594,25 @@ def team_requests(
                 .filter(Employee.company_id == user.company_id, Employee.reporting_manager_id == my_emp_id)
                 .all()
             )
+            # Departments where I'm configured as Level 1 or Level 2 approver —
+            # Level 2 shows up here too so they can act once Level 1 is out;
+            # _can_review still gates the actual approve/reject action.
+            configured_dept_ids = [
+                c.department_id for c in db.query(LeaveApprovalConfig).filter(
+                    LeaveApprovalConfig.company_id == user.company_id,
+                    LeaveApprovalConfig.status == "active",
+                    or_(
+                        LeaveApprovalConfig.level1_employee_id == my_emp_id,
+                        LeaveApprovalConfig.level2_employee_id == my_emp_id,
+                    ),
+                ).all()
+            ]
+            if configured_dept_ids:
+                reviewable_ids.update(
+                    e.id for e in db.query(Employee.id)
+                    .filter(Employee.company_id == user.company_id, Employee.department_id.in_(configured_dept_ids))
+                    .all()
+                )
         if not reviewable_ids:
             raise HTTPException(status_code=403, detail="Not authorized")
         q = q.filter(LeaveRequest.employee_id.in_(reviewable_ids))
