@@ -693,6 +693,7 @@ function OrganizationDetailsService() {
         contact_person: c.contact_person || "", contact_number: c.contact_number || "", contact_email: c.contact_email || "",
         address_line1: c.address_line1 || "", address_line2: c.address_line2 || "",
         city: c.city || "", state: c.state || "", country: c.country || "", postal_code: c.postal_code || "",
+        gst_number: c.gst_number || "", pan_number: c.pan_number || "", alt_contact_number: c.alt_contact_number || "",
       });
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
@@ -767,8 +768,19 @@ function OrganizationDetailsService() {
               <ModalField label="Contact Number">
                 <Input value={form.contact_number} onChange={e => setForm((f: any) => ({ ...f, contact_number: e.target.value }))}/>
               </ModalField>
-              <ModalField label="Contact Email *">
-                <Input type="email" value={form.contact_email} onChange={e => setForm((f: any) => ({ ...f, contact_email: e.target.value }))}/>
+              <ModalField label="Alternate Contact Number">
+                <Input value={form.alt_contact_number} onChange={e => setForm((f: any) => ({ ...f, alt_contact_number: e.target.value }))}/>
+              </ModalField>
+            </div>
+            <ModalField label="Contact Email *">
+              <Input type="email" value={form.contact_email} onChange={e => setForm((f: any) => ({ ...f, contact_email: e.target.value }))}/>
+            </ModalField>
+            <div className="grid grid-cols-2 gap-4">
+              <ModalField label="GST Number">
+                <Input placeholder="22AAAAA0000A1Z5" value={form.gst_number} onChange={e => setForm((f: any) => ({ ...f, gst_number: e.target.value }))}/>
+              </ModalField>
+              <ModalField label="PAN Number">
+                <Input placeholder="AAAAA0000A" value={form.pan_number} onChange={e => setForm((f: any) => ({ ...f, pan_number: e.target.value }))}/>
               </ModalField>
             </div>
           </div>

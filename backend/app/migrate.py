@@ -58,6 +58,9 @@ NEW_COLUMNS = {
         "postal_code": "VARCHAR(20)",
         "logo_url": "VARCHAR(500)",
         "super_admin_company_id": "INTEGER",
+        "gst_number": "VARCHAR(20)",
+        "pan_number": "VARCHAR(20)",
+        "alt_contact_number": "VARCHAR(30)",
     },
     "shifts": {
         "color": "VARCHAR(20)",

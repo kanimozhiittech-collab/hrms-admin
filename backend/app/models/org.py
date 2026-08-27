@@ -24,6 +24,9 @@ class Company(Base):
     country: Mapped[str | None] = mapped_column(String(100))
     postal_code: Mapped[str | None] = mapped_column(String(20))
     logo_url: Mapped[str | None] = mapped_column(String(500))
+    gst_number: Mapped[str | None] = mapped_column(String(20))
+    pan_number: Mapped[str | None] = mapped_column(String(20))
+    alt_contact_number: Mapped[str | None] = mapped_column(String(30))
     # This company's row id in the Super Admin app's own DB — set at provisioning
     # time, used to route support tickets and other cross-app calls to the
     # right Super Admin company record.

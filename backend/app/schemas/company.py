@@ -14,6 +14,9 @@ class CompanyUpdateIn(BaseModel):
     state: Optional[str] = None
     country: Optional[str] = None
     postal_code: Optional[str] = None
+    gst_number: Optional[str] = None
+    pan_number: Optional[str] = None
+    alt_contact_number: Optional[str] = None
 
 class CompanyOut(BaseModel):
     id: str
@@ -30,4 +33,7 @@ class CompanyOut(BaseModel):
     country: Optional[str] = None
     postal_code: Optional[str] = None
     logo_url: Optional[str] = None
+    gst_number: Optional[str] = None
+    pan_number: Optional[str] = None
+    alt_contact_number: Optional[str] = None
     class Config: from_attributes = True
