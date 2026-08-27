@@ -59,6 +59,7 @@ export const api = {
 
   dashboard: () => request<any>("/api/dashboard"),
   dashboardOverview: () => request<any>("/api/dashboard/overview"),
+  dashboardWidgets: () => request<any>("/api/dashboard/widgets"),
   checkIn: () => request<any>("/api/dashboard/check-in", { method: "POST" }),
 
   listEmployees: (params: Record<string, any> = {}) => {

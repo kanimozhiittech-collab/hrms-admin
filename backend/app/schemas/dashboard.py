@@ -93,3 +93,14 @@ class DashboardOverview(BaseModel):
     profile_details: OverviewProfileDetails
     time_logs: OverviewTimeLogs
     modules: dict[str, OverviewModuleState]
+
+class WidgetPerson(BaseModel):
+    id: str
+    name: str
+    role: str
+    ext: Optional[str] = None
+    avatar: Optional[str] = None
+
+class DashboardWidgets(BaseModel):
+    new_hires: List[WidgetPerson]
+    birthdays_today: List[WidgetPerson]

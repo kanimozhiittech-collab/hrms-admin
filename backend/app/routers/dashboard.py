@@ -11,6 +11,7 @@ from ..schemas.dashboard import (
     Activity,
     AttendancePoint,
     DashboardOverview,
+    DashboardWidgets,
     DeptCount,
     GrowthPoint,
     OverviewActivity,
@@ -20,6 +21,7 @@ from ..schemas.dashboard import (
     OverviewShift,
     OverviewTimeLogs,
     OverviewWeekDay,
+    WidgetPerson,
 )
 from .deps import current_user
 
@@ -271,6 +273,40 @@ def stats(db: Session = Depends(get_db), user: User = Depends(current_user)):
 @router.get("/overview", response_model=DashboardOverview)
 def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
     return _overview_payload(db, user)
+
+def _display_name_for(e: Employee) -> str:
+    return e.display_name or f"{e.first_name} {e.last_name}".strip()
+
+@router.get("/widgets", response_model=DashboardWidgets)
+def widgets(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    today = today_ist()
+    designations = {d.id: d.title for d in db.query(Designation).filter(Designation.company_id == user.company_id).all()}
+
+    def as_person(e: Employee) -> WidgetPerson:
+        return WidgetPerson(
+            id=e.emp_code, name=_display_name_for(e),
+            role=designations.get(e.designation_id) or "",
+            ext=e.mobile, avatar=e.photo_url,
+        )
+
+    recent_joiners = (
+        db.query(Employee)
+        .filter(Employee.company_id == user.company_id, Employee.date_of_joining != None)
+        .order_by(Employee.date_of_joining.desc())
+        .limit(5)
+        .all()
+    )
+    all_employees = db.query(Employee).filter(
+        Employee.company_id == user.company_id, Employee.date_of_birth != None
+    ).all()
+    birthdays_today = [
+        e for e in all_employees
+        if e.date_of_birth.month == today.month and e.date_of_birth.day == today.day
+    ]
+    return DashboardWidgets(
+        new_hires=[as_person(e) for e in recent_joiners],
+        birthdays_today=[as_person(e) for e in birthdays_today],
+    )
 
 def _apply_metrics(db: Session, log: AttendanceLog, user: User, employee: Employee | None):
     """Compute work_hours / overtime / late / early-exit from the employee's

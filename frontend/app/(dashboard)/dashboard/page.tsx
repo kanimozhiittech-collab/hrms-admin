@@ -127,28 +127,6 @@ const weekRows = [
   { day: "Sat", date: "20", note: "Weekend", tone: "bg-amber-50 text-amber-600" },
 ];
 
-const newHires = [
-  {
-    id: "S3",
-    name: "Clarkson Walter",
-    role: "Administration - Management",
-    ext: "3",
-    avatar: "https://i.pravatar.cc/80?img=12",
-  },
-  {
-    id: "S7",
-    name: "Hazel Carter",
-    role: "Assistant Manager - Marketing",
-    ext: "9",
-    avatar: "https://i.pravatar.cc/80?img=47",
-  },
-];
-
-const announcements = [
-  { title: "Welcome to HRMS", date: "16 Jun 10:34 AM", by: "HR Team" },
-  { title: "Quarterly all-hands on Friday", date: "15 Jun 09:12 AM", by: "CEO Office" },
-];
-
 /** The "…" menus scattered around Home currently only expose one useful,
  * always-safe action — re-fetching whatever data the page is showing.
  * Rendered through a portal because some of these buttons live inside a
@@ -1110,6 +1088,8 @@ function DashboardWidgets() {
   const [orgFiles, setOrgFiles] = useState<any[]>([]);
   const [employeeFiles, setEmployeeFiles] = useState<any[]>([]);
   const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
+  const [newHires, setNewHires] = useState<any[]>([]);
+  const [birthdaysToday, setBirthdaysToday] = useState<any[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   function loadWidgetData() {
@@ -1122,6 +1102,10 @@ function DashboardWidgets() {
     api.holidays(new Date().getFullYear())
       .then(rows => setUpcomingHolidays(rows.filter((h: any) => h.holiday_date >= todayKey).slice(0, 5)))
       .catch(() => {});
+    api.dashboardWidgets().then(w => {
+      setNewHires(w.new_hires || []);
+      setBirthdaysToday(w.birthdays_today || []);
+    }).catch(() => {});
   }
 
   useEffect(() => {
@@ -1151,29 +1135,53 @@ function DashboardWidgets() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {!hidden.has("Birthday") && (
         <WidgetCard title="Birthday" icon={Cake}>
-          <EmptyState text="No birthdays today" />
+          {birthdaysToday.length === 0 ? (
+            <EmptyState text="No birthdays today" />
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {birthdaysToday.map((person) => (
+                <li key={person.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  {person.avatar
+                    ? <img src={fileUrl(person.avatar)} alt={person.name} className="h-12 w-12 rounded-md object-cover" />
+                    : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-400"><Cake className="h-5 w-5"/></div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
+                    <p className="truncate text-xs text-slate-500">{person.role}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </WidgetCard>
         )}
 
         {!hidden.has("New Hires") && (
         <WidgetCard title="New Hires" icon={UserPlus}>
-          <ul className="divide-y divide-slate-200">
-            {newHires.map((person) => (
-              <li key={person.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <img src={person.avatar} alt={person.name} className="h-12 w-12 rounded-md object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">
-                    <span className="text-slate-500">{person.id} - </span>
-                    <span className="font-semibold text-slate-900">{person.name}</span>
-                  </p>
-                  <p className="truncate text-xs text-slate-500">{person.role}</p>
-                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                    <Phone className="h-3 w-3" /> {person.ext}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {newHires.length === 0 ? (
+            <EmptyState text="No new hires yet" />
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {newHires.map((person) => (
+                <li key={person.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  {person.avatar
+                    ? <img src={fileUrl(person.avatar)} alt={person.name} className="h-12 w-12 rounded-md object-cover" />
+                    : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-400"><UserPlus className="h-5 w-5"/></div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">
+                      <span className="text-slate-500">{person.id} - </span>
+                      <span className="font-semibold text-slate-900">{person.name}</span>
+                    </p>
+                    <p className="truncate text-xs text-slate-500">{person.role}</p>
+                    {person.ext && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                        <Phone className="h-3 w-3" /> {person.ext}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </WidgetCard>
         )}
 
@@ -1191,19 +1199,7 @@ function DashboardWidgets() {
 
         {!hidden.has("Announcements") && (
         <WidgetCard title="Announcements" icon={Megaphone}>
-          <ul className="space-y-3">
-            {announcements.map((item) => (
-              <li key={item.title} className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
-                  <p className="text-xs text-slate-500">
-                    {item.date} · {item.by}
-                  </p>
-                </div>
-                <Badge className="shrink-0 text-[10px]">New</Badge>
-              </li>
-            ))}
-          </ul>
+          <EmptyState text="No announcements yet" />
         </WidgetCard>
         )}
 
