@@ -82,7 +82,7 @@ export function Sidebar() {
         )}
         <div className={cn(collapsed && "md:hidden")}>
           <div className="text-sm font-semibold truncate max-w-[140px]">{company?.name || "HRMS"}</div>
-          <div className="text-[11px] text-slate-400">HRMS Suite</div>
+          <div className="text-[11px] text-slate-400">HRMS</div>
         </div>
         {/* Close button — mobile only */}
         <button
@@ -97,7 +97,6 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-6 p-3">
         <div>
-          <div className={cn("px-2 mb-2 text-[10px] uppercase tracking-wider text-slate-400", collapsed && "md:hidden")}>Overview</div>
           <div className="space-y-0.5">
             {nav.map(i => {
               const active = pathname === i.href || (i.href !== "/dashboard" && pathname.startsWith(i.href));
