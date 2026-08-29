@@ -6,12 +6,14 @@ import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { api, fileUrl } from "@/lib/api";
 import { Plus, Search, Download, LayoutList, LayoutGrid } from "lucide-react";
 
 const STATUS_TONE: Record<string, any> = { Active: "green", "On Leave": "amber", Inactive: "slate", Resigned: "red" };
+const STATUS_OPTIONS = ["Active", "On Leave", "Inactive", "Resigned"];
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 
@@ -118,14 +120,20 @@ export default function EmployeesPage() {
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
                 <Input placeholder="Search by name, email, ID…" value={q} onChange={e=>{setPage(1);setQ(e.target.value);}} className="pl-8"/>
               </div>
-              <Select value={dept} onChange={e=>{setPage(1);setDept(e.target.value);}} className="max-w-[200px]">
-                <option value="">All Departments</option>
-                {depts.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Select>
-              <Select value={status} onChange={e=>{setPage(1);setStatus(e.target.value);}} className="max-w-[160px]">
-                <option value="">All Status</option>
-                <option>Active</option><option>On Leave</option><option>Inactive</option><option>Resigned</option>
-              </Select>
+              <SearchableSelect
+                value={dept}
+                onChange={(v) => { setPage(1); setDept(v); }}
+                placeholder="All Departments"
+                className="max-w-[200px]"
+                options={[{ value: "", label: "All Departments" }, ...depts.map((d) => ({ value: d.id, label: d.name }))]}
+              />
+              <SearchableSelect
+                value={status}
+                onChange={(v) => { setPage(1); setStatus(v); }}
+                placeholder="All Status"
+                className="max-w-[160px]"
+                options={[{ value: "", label: "All Status" }, ...STATUS_OPTIONS.map((s) => ({ value: s, label: s }))]}
+              />
             </div>
 
             {loading ? (
@@ -153,12 +161,8 @@ export default function EmployeesPage() {
               </div>
             )}
 
-            <div className="flex flex-col items-center gap-2 p-4 border-t border-slate-100">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</Button>
-                <Button variant="outline" size="sm" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Next</Button>
-              </div>
-              <div className="text-xs text-slate-500">Page {page} of {totalPages}</div>
+            <div className="p-4 border-t border-slate-100">
+              <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
             </div>
           </Card>
         ) : (
@@ -168,14 +172,20 @@ export default function EmployeesPage() {
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
               <Input placeholder="Search by name, email, ID…" value={q} onChange={e=>{setPage(1);setQ(e.target.value);}} className="pl-8"/>
             </div>
-            <Select value={dept} onChange={e=>{setPage(1);setDept(e.target.value);}} className="max-w-[200px]">
-              <option value="">All Departments</option>
-              {depts.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
-            </Select>
-            <Select value={status} onChange={e=>{setPage(1);setStatus(e.target.value);}} className="max-w-[160px]">
-              <option value="">All Status</option>
-              <option>Active</option><option>On Leave</option><option>Inactive</option><option>Resigned</option>
-            </Select>
+            <SearchableSelect
+              value={dept}
+              onChange={(v) => { setPage(1); setDept(v); }}
+              placeholder="All Departments"
+              className="max-w-[200px]"
+              options={[{ value: "", label: "All Departments" }, ...depts.map((d) => ({ value: d.id, label: d.name }))]}
+            />
+            <SearchableSelect
+              value={status}
+              onChange={(v) => { setPage(1); setStatus(v); }}
+              placeholder="All Status"
+              className="max-w-[160px]"
+              options={[{ value: "", label: "All Status" }, ...STATUS_OPTIONS.map((s) => ({ value: s, label: s }))]}
+            />
           </div>
 
           <div className="overflow-x-auto">
@@ -219,12 +229,8 @@ export default function EmployeesPage() {
             </table>
           </div>
 
-          <div className="flex flex-col items-center gap-2 p-4 border-t border-slate-100">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</Button>
-              <Button variant="outline" size="sm" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Next</Button>
-            </div>
-            <div className="text-xs text-slate-500">Page {page} of {totalPages}</div>
+          <div className="p-4 border-t border-slate-100">
+            <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
           </div>
         </Card>
         )}
