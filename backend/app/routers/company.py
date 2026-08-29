@@ -12,9 +12,8 @@ from .deps import current_user
 
 router = APIRouter(prefix="/api/company", tags=["company"])
 
-LOGO_MAX_BYTES = 500 * 1024
-LOGO_WIDTH = 80
-LOGO_HEIGHT = 55
+LOGO_MAX_BYTES = 2 * 1024 * 1024
+LOGO_MAX_DIMENSION = 512
 
 
 def _require_admin(user: User):
@@ -52,19 +51,23 @@ def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), use
 
     raw = file.file.read()
     if len(raw) > LOGO_MAX_BYTES:
-        raise HTTPException(400, f"Logo must be {LOGO_MAX_BYTES // 1024}KB or smaller")
+        raise HTTPException(400, f"Logo must be {LOGO_MAX_BYTES // (1024 * 1024)}MB or smaller")
     try:
         img = Image.open(io.BytesIO(raw))
         img.verify()
         img = Image.open(io.BytesIO(raw))  # re-open: verify() leaves the image unusable
     except Exception:
         raise HTTPException(400, "Invalid image file")
-    if img.width != LOGO_WIDTH or img.height != LOGO_HEIGHT:
-        raise HTTPException(
-            400, f"Logo must be exactly {LOGO_WIDTH}x{LOGO_HEIGHT}px (uploaded image is {img.width}x{img.height}px)"
-        )
 
-    _, company.logo_url = save_bytes(raw, file.filename, "company-logos")
+    # Any reasonable logo is accepted — downscale to a sane max size (never
+    # upscale) and normalize to PNG so callers don't have to pre-crop to a
+    # specific pixel size before uploading.
+    img = img.convert("RGBA")
+    img.thumbnail((LOGO_MAX_DIMENSION, LOGO_MAX_DIMENSION))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+
+    _, company.logo_url = save_bytes(buf.getvalue(), "logo.png", "company-logos")
     db.commit()
     db.refresh(company)
     return company
