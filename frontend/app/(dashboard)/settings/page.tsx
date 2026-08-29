@@ -1322,8 +1322,21 @@ function ApprovalConfigService() {
 }
 
 function EmployeeInformationService() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Same URL-persistence approach as the top-level service picker — so
+  // refreshing while on, say, Departments doesn't drop you back on
+  // Organization Details.
+  const section = searchParams.get("section") || "organization";
+
+  function setSection(v: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("section", v);
+    router.push(`/settings?${params.toString()}`);
+  }
+
   return (
-    <Tabs defaultValue="organization">
+    <Tabs defaultValue="organization" value={section} onValueChange={setSection}>
       <TabsList>
         <TabsTrigger value="organization">Organization Details</TabsTrigger>
         <TabsTrigger value="departments">Departments</TabsTrigger>
