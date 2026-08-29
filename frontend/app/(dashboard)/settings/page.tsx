@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -1817,12 +1818,18 @@ function HrLettersService() {
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="text-sm text-slate-500">{filtered.length} request{filtered.length === 1 ? "" : "s"}</div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search requests…" />
-        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[140px]">
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Issued">Issued</option>
-          <option value="Rejected">Rejected</option>
-        </Select>
+        <SearchableSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          placeholder="All Status"
+          className="max-w-[140px]"
+          options={[
+            { value: "", label: "All Status" },
+            { value: "Pending", label: "Pending" },
+            { value: "Issued", label: "Issued" },
+            { value: "Rejected", label: "Rejected" },
+          ]}
+        />
         <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Request</Button>
       </div>
       {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
@@ -1849,11 +1856,16 @@ function HrLettersService() {
                 <td className="px-4 py-3 text-slate-600">{r.date_of_request}</td>
                 <td className="px-4 py-3 text-slate-600">{r.reason || "—"}</td>
                 <td className="px-4 py-3">
-                  <Select value={r.status} onChange={e => setStatus(r.id, e.target.value)} className="w-32 h-8 text-xs">
-                    <option>Pending</option>
-                    <option>Issued</option>
-                    <option>Rejected</option>
-                  </Select>
+                  <SearchableSelect
+                    value={r.status}
+                    onChange={v => setStatus(r.id, v)}
+                    className="w-32"
+                    options={[
+                      { value: "Pending", label: "Pending" },
+                      { value: "Issued", label: "Issued" },
+                      { value: "Rejected", label: "Rejected" },
+                    ]}
+                  />
                 </td>
               </tr>
             ))}
@@ -1871,32 +1883,40 @@ function HrLettersService() {
           </>}
         >
           <ModalField label="Employee *">
-            <Select value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}>
-              <option value="">Select</option>
-              {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
-            </Select>
+            <SearchableSelect
+              value={form.employee_id}
+              onChange={v => setForm(f => ({ ...f, employee_id: v }))}
+              options={employees.map(e => ({ value: e.id, label: `${e.first_name} ${e.last_name}` }))}
+            />
           </ModalField>
           <div className="grid grid-cols-2 gap-4">
             <ModalField label="Letter Type">
-              <Select value={form.letter_type} onChange={e => setForm(f => ({ ...f, letter_type: e.target.value }))}>
-                <option>Address Proof</option>
-                <option>Bonafide Letter</option>
-                <option>Experience Letter</option>
-              </Select>
+              <SearchableSelect
+                value={form.letter_type}
+                onChange={v => setForm(f => ({ ...f, letter_type: v }))}
+                options={[
+                  { value: "Address Proof", label: "Address Proof" },
+                  { value: "Bonafide Letter", label: "Bonafide Letter" },
+                  { value: "Experience Letter", label: "Experience Letter" },
+                ]}
+              />
             </ModalField>
             <ModalField label="Date of Request">
-              <Input type="date" value={form.date_of_request} onChange={e => setForm(f => ({ ...f, date_of_request: e.target.value }))}/>
+              <DatePicker value={form.date_of_request} onChange={v => setForm(f => ({ ...f, date_of_request: v }))}/>
             </ModalField>
           </div>
           <ModalField label="Reason for Request">
-            <Select value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}>
-              <option value="">Select</option>
-              <option>Visa application</option>
-              <option>Bank loan</option>
-              <option>Address proof</option>
-              <option>Higher education</option>
-              <option>Other</option>
-            </Select>
+            <SearchableSelect
+              value={form.reason}
+              onChange={v => setForm(f => ({ ...f, reason: v }))}
+              options={[
+                { value: "Visa application", label: "Visa application" },
+                { value: "Bank loan", label: "Bank loan" },
+                { value: "Address proof", label: "Address proof" },
+                { value: "Higher education", label: "Higher education" },
+                { value: "Other", label: "Other" },
+              ]}
+            />
           </ModalField>
         </Modal>
       )}
