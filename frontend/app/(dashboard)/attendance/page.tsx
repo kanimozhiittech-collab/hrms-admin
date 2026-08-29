@@ -4,12 +4,16 @@ import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Download, Clock, CalendarClock, CheckCircle2, XCircle, Search } from "lucide-react";
 import { toast } from "sonner";
+
+const PAGE_SIZE = 10;
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -65,6 +69,10 @@ export default function AttendancePage() {
   const [teamRegs, setTeamRegs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
+  const [myPage, setMyPage] = useState(1);
+  const [teamPage, setTeamPage] = useState(1);
+  const [regsPage, setRegsPage] = useState(1);
+  const [teamRegsPage, setTeamRegsPage] = useState(1);
 
   // regularization form
   const [regForm, setRegForm] = useState({ work_date: now.toISOString().slice(0, 10), check_in: "", check_out: "", reason: "" });
@@ -135,6 +143,20 @@ export default function AttendancePage() {
     (l.employee_name || "").toLowerCase().includes(teamSearch.toLowerCase())
   );
 
+  const myTotalPages = Math.max(1, Math.ceil(myLogs.length / PAGE_SIZE));
+  const myPaged = myLogs.slice((myPage - 1) * PAGE_SIZE, myPage * PAGE_SIZE);
+  const teamTotalPages = Math.max(1, Math.ceil(teamFiltered.length / PAGE_SIZE));
+  const teamPaged = teamFiltered.slice((teamPage - 1) * PAGE_SIZE, teamPage * PAGE_SIZE);
+  const regsTotalPages = Math.max(1, Math.ceil(regs.length / PAGE_SIZE));
+  const regsPaged = regs.slice((regsPage - 1) * PAGE_SIZE, regsPage * PAGE_SIZE);
+  const teamRegsTotalPages = Math.max(1, Math.ceil(teamRegs.length / PAGE_SIZE));
+  const teamRegsPaged = teamRegs.slice((teamRegsPage - 1) * PAGE_SIZE, teamRegsPage * PAGE_SIZE);
+
+  useEffect(() => { setMyPage(1); }, [statusFilter, month, year]);
+  useEffect(() => { setTeamPage(1); }, [statusFilter, teamSearch, teamDate]);
+  useEffect(() => { setRegsPage(1); }, [regs.length]);
+  useEffect(() => { setTeamRegsPage(1); }, [teamRegs.length]);
+
   return (
     <>
       <Topbar title="Attendance" />
@@ -155,16 +177,25 @@ export default function AttendancePage() {
         {tab === "my" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={month} onChange={e => setMonth(+e.target.value)} className="max-w-[140px]">
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </Select>
-              <Select value={year} onChange={e => setYear(+e.target.value)} className="max-w-[120px]">
-                {[year + 1, year, year - 1, year - 2].map(y => <option key={y} value={y}>{y}</option>)}
-              </Select>
-              <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
-                <option value="">All Status</option>
-                {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </Select>
+              <SearchableSelect
+                value={String(month)}
+                onChange={v => setMonth(Number(v))}
+                className="max-w-[140px]"
+                options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))}
+              />
+              <SearchableSelect
+                value={String(year)}
+                onChange={v => setYear(Number(v))}
+                className="max-w-[120px]"
+                options={[year + 1, year, year - 1, year - 2].map(y => ({ value: String(y), label: String(y) }))}
+              />
+              <SearchableSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="All Status"
+                className="max-w-[160px]"
+                options={[{ value: "", label: "All Status" }, ...Object.keys(STATUS_LABEL).map(s => ({ value: s, label: STATUS_LABEL[s] }))]}
+              />
             </div>
 
             {/* stat cards */}
@@ -203,7 +234,7 @@ export default function AttendancePage() {
                     {!loading && myLogs.length === 0 && (
                       <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No attendance records match.</td></tr>
                     )}
-                    {myLogs.map((l: any) => (
+                    {myPaged.map((l: any) => (
                       <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3 text-slate-700">{new Date(l.work_date).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })}</td>
                         <td className="px-4 py-3">
@@ -220,6 +251,9 @@ export default function AttendancePage() {
                   </tbody>
                 </table>
               </div>
+              <div className="p-4 border-t border-slate-100">
+                <Pagination page={myPage} totalPages={myTotalPages} onChange={setMyPage}/>
+              </div>
             </Card>
           </div>
         )}
@@ -229,15 +263,18 @@ export default function AttendancePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <Input type="date" value={teamDate} onChange={e => setTeamDate(e.target.value)} className="max-w-[180px]" />
+                <DatePicker value={teamDate} onChange={setTeamDate} className="max-w-[180px]" />
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                   <Input placeholder="Search employee…" value={teamSearch} onChange={e => setTeamSearch(e.target.value)} className="pl-8 max-w-[200px]" />
                 </div>
-                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
-                  <option value="">All Status</option>
-                  {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                </Select>
+                <SearchableSelect
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  placeholder="All Status"
+                  className="max-w-[160px]"
+                  options={[{ value: "", label: "All Status" }, ...Object.keys(STATUS_LABEL).map(s => ({ value: s, label: STATUS_LABEL[s] }))]}
+                />
               </div>
               <Button
                 variant="outline"
@@ -264,7 +301,7 @@ export default function AttendancePage() {
                     {!loading && teamFiltered.length === 0 && (
                       <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No attendance logged for this date.</td></tr>
                     )}
-                    {teamFiltered.map((l: any) => (
+                    {teamPaged.map((l: any) => (
                       <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3 font-medium text-slate-800">{l.employee_name || "—"}</td>
                         <td className="px-4 py-3"><Badge tone={STATUS_TONE[l.status] || "slate"}>{STATUS_LABEL[l.status] || l.status}</Badge></td>
@@ -276,6 +313,9 @@ export default function AttendancePage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="p-4 border-t border-slate-100">
+                <Pagination page={teamPage} totalPages={teamTotalPages} onChange={setTeamPage}/>
               </div>
             </Card>
           </div>
@@ -292,7 +332,7 @@ export default function AttendancePage() {
               <form onSubmit={submitReg} className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600">Date</label>
-                  <Input type="date" value={regForm.work_date} onChange={e => setRegForm({ ...regForm, work_date: e.target.value })} required />
+                  <DatePicker value={regForm.work_date} onChange={v => setRegForm({ ...regForm, work_date: v })}/>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -319,7 +359,7 @@ export default function AttendancePage() {
               <div className="px-4 py-3 border-b border-slate-100 font-medium text-slate-800">My Requests</div>
               <div className="divide-y divide-slate-100">
                 {regs.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No regularization requests yet.</div>}
-                {regs.map((r: any) => (
+                {regsPaged.map((r: any) => (
                   <div key={r.id} className="px-4 py-3 flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-medium text-slate-800">{new Date(r.work_date).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</div>
@@ -330,6 +370,9 @@ export default function AttendancePage() {
                     </Badge>
                   </div>
                 ))}
+              </div>
+              <div className="p-4 border-t border-slate-100">
+                <Pagination page={regsPage} totalPages={regsTotalPages} onChange={setRegsPage}/>
               </div>
             </Card>
 
@@ -348,7 +391,7 @@ export default function AttendancePage() {
                   {teamRegs.length === 0 && (
                     <div className="px-4 py-10 text-center text-slate-400 text-sm">No regularization requests from your team.</div>
                   )}
-                  {teamRegs.map((r: any) => (
+                  {teamRegsPaged.map((r: any) => (
                     <div key={r.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <div className="text-sm font-medium text-slate-800">
@@ -373,6 +416,9 @@ export default function AttendancePage() {
                       )}
                     </div>
                   ))}
+                </div>
+                <div className="p-4 border-t border-slate-100">
+                  <Pagination page={teamRegsPage} totalPages={teamRegsTotalPages} onChange={setTeamRegsPage}/>
                 </div>
               </Card>
             )}
