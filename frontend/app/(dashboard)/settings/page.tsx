@@ -789,7 +789,7 @@ function OrganizationDetailsService() {
                       onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
                     />
                   </label>
-                  <p className="text-[11px] text-slate-400">Exactly 80×55px, max 500KB</p>
+                  <p className="text-[11px] text-slate-400">Any square-ish image, max 2MB</p>
                 </div>
               </div>
             </ModalField>
@@ -1269,39 +1269,47 @@ function ApprovalConfigService() {
           </>}
         >
           <ModalField label="Module *">
-            <Select value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))}>
-              <option value="Leave">Leave</option>
-              <option value="Regularization">Regularization</option>
-            </Select>
+            <SearchableSelect
+              value={form.module}
+              onChange={v => setForm(f => ({ ...f, module: v }))}
+              options={[
+                { value: "Leave", label: "Leave" },
+                { value: "Regularization", label: "Regularization" },
+              ]}
+            />
           </ModalField>
           <ModalField label="Department *">
-            <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
-              <option value="">Select</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </Select>
+            <SearchableSelect
+              value={form.department_id}
+              onChange={v => setForm(f => ({ ...f, department_id: v }))}
+              options={departments.map(d => ({ value: d.id, label: d.name }))}
+            />
           </ModalField>
           <ModalField label="Approval Type *">
-            <Select value={form.approval_type} onChange={e => setForm(f => ({ ...f, approval_type: e.target.value }))}>
-              <option value="single_level">Single Level</option>
-              <option value="two_level">Two Level</option>
-            </Select>
+            <SearchableSelect
+              value={form.approval_type}
+              onChange={v => setForm(f => ({ ...f, approval_type: v }))}
+              options={[
+                { value: "single_level", label: "Single Level" },
+                { value: "two_level", label: "Two Level" },
+              ]}
+            />
           </ModalField>
           <div className="grid grid-cols-2 gap-4">
             <ModalField label="Level 1 (Primary Approver) *">
-              <Select value={form.level1_employee_id} onChange={e => setForm(f => ({ ...f, level1_employee_id: e.target.value }))}>
-                <option value="">Select</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{empLabel(e)}</option>)}
-              </Select>
+              <SearchableSelect
+                value={form.level1_employee_id}
+                onChange={v => setForm(f => ({ ...f, level1_employee_id: v }))}
+                options={employees.map(e => ({ value: e.id, label: empLabel(e) }))}
+              />
             </ModalField>
             <ModalField label={form.approval_type === "two_level" ? "Level 2 (Backup Approver) *" : "Level 2 (Backup Approver)"}>
-              <Select
+              <SearchableSelect
                 value={form.level2_employee_id}
-                onChange={e => setForm(f => ({ ...f, level2_employee_id: e.target.value }))}
+                onChange={v => setForm(f => ({ ...f, level2_employee_id: v }))}
                 disabled={form.approval_type !== "two_level"}
-              >
-                <option value="">Select</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{empLabel(e)}</option>)}
-              </Select>
+                options={employees.map(e => ({ value: e.id, label: empLabel(e) }))}
+              />
             </ModalField>
           </div>
           <p className="text-[11px] text-slate-400 -mt-2">
@@ -1310,10 +1318,14 @@ function ApprovalConfigService() {
             route to Level 2 instead.
           </p>
           <ModalField label="Status">
-            <Select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
+            <SearchableSelect
+              value={form.status}
+              onChange={v => setForm(f => ({ ...f, status: v }))}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+            />
           </ModalField>
         </Modal>
       )}
