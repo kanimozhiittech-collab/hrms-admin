@@ -784,7 +784,7 @@ function OrganizationDetailsService() {
                   : <div className="h-14 w-14 rounded-lg bg-slate-100 grid place-items-center text-slate-300 text-[10px]">No logo</div>}
                 <div>
                   <label className="text-sm text-brand-600 hover:underline cursor-pointer">
-                    {uploadingLogo ? "Uploading…" : company?.logo_url ? "Change" : "Add Logo"}
+                    {uploadingLogo ? "Uploading…" : "Add Logo"}
                     <input
                       type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
                       onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }}
