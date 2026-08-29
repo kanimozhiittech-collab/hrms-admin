@@ -6,7 +6,12 @@ import { superadmin, type Plan } from "@/lib/superadmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type FormErrors = Partial<Record<"companyName" | "adminName" | "adminEmail" | "phone", string>>;
 
 export default function RegisterPage() {
   // No plan picker here — a self-registered company starts on the default
@@ -22,6 +27,10 @@ export default function RegisterPage() {
   const [locations, setLocations] = useState("");
   const [loading, setLoading] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const clearError = (field: keyof FormErrors) =>
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
 
   useEffect(() => {
     superadmin.listPlans()
@@ -34,8 +43,21 @@ export default function RegisterPage() {
       .catch((err) => toast.error(err.message || "Failed to load plans"));
   }, []);
 
+  function validate(): FormErrors {
+    const next: FormErrors = {};
+    if (!companyName.trim()) next.companyName = "Company name is required";
+    if (!adminName.trim()) next.adminName = "Admin name is required";
+    if (!adminEmail.trim()) next.adminEmail = "Company email is required";
+    else if (!EMAIL_RE.test(adminEmail)) next.adminEmail = "Enter a valid email address";
+    if (phone.length !== 10) next.phone = "Enter a valid 10-digit phone number";
+    return next;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const nextErrors = validate();
+    if (Object.keys(nextErrors).length > 0) { setErrors(nextErrors); return; }
+    setErrors({});
     if (defaultPlanId === null) { toast.error("No plan is available for registration — contact support."); return; }
     setLoading(true);
     try {
@@ -96,7 +118,7 @@ export default function RegisterPage() {
       </div>
 
       <div className="flex items-center justify-center p-6 py-10">
-        <form onSubmit={onSubmit} className="w-full max-w-lg space-y-6">
+        <form onSubmit={onSubmit} noValidate className="w-full max-w-lg space-y-6">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">Register your company</h2>
             <p className="text-sm text-slate-500 mt-1">Tell us about your company and we&apos;ll activate your account right away.</p>
@@ -105,25 +127,48 @@ export default function RegisterPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="companyName">Company name</Label>
-              <Input id="companyName" required value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Erode Spinners Pvt Ltd" />
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => { setCompanyName(e.target.value); clearError("companyName"); }}
+                placeholder="Erode Spinners Pvt Ltd"
+                className={cn(errors.companyName && "border-red-500 focus:ring-red-500")}
+              />
+              {errors.companyName && <p className="text-xs text-red-600">{errors.companyName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="adminName">Admin name</Label>
-              <Input id="adminName" required value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Senthil Kumar" />
+              <Input
+                id="adminName"
+                value={adminName}
+                onChange={(e) => { setAdminName(e.target.value); clearError("adminName"); }}
+                placeholder="Senthil Kumar"
+                className={cn(errors.adminName && "border-red-500 focus:ring-red-500")}
+              />
+              {errors.adminName && <p className="text-xs text-red-600">{errors.adminName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="adminEmail">Company email</Label>
-              <Input id="adminEmail" type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value.toLowerCase())} placeholder="senthil@company.com" />
+              <Input
+                id="adminEmail"
+                type="email"
+                value={adminEmail}
+                onChange={(e) => { setAdminEmail(e.target.value.toLowerCase()); clearError("adminEmail"); }}
+                placeholder="senthil@company.com"
+                className={cn(errors.adminEmail && "border-red-500 focus:ring-red-500")}
+              />
+              {errors.adminEmail && <p className="text-xs text-red-600">{errors.adminEmail}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone">Phone (10 digits)</Label>
               <Input
-                id="phone" required type="tel" inputMode="numeric" maxLength={10}
-                pattern="\d{10}" title="Enter exactly 10 digits"
+                id="phone" type="tel" inputMode="numeric" maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); clearError("phone"); }}
                 placeholder="9876543210"
+                className={cn(errors.phone && "border-red-500 focus:ring-red-500")}
               />
+              {errors.phone && <p className="text-xs text-red-600">{errors.phone}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="gstNumber">GST Number (optional)</Label>
