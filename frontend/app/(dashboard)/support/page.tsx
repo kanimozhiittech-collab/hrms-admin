@@ -4,11 +4,14 @@ import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Plus, X, LifeBuoy } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 const STATUS_TONE: Record<string, any> = {
   open: "amber", in_progress: "blue", resolved: "green", closed: "slate",
@@ -26,6 +29,7 @@ export default function SupportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showRaise, setShowRaise] = useState(false);
+  const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true); setError("");
@@ -34,6 +38,9 @@ export default function SupportPage() {
     finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  const totalPages = Math.max(1, Math.ceil(tickets.length / PAGE_SIZE));
+  const paged = tickets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <>
@@ -69,7 +76,7 @@ export default function SupportPage() {
                     No support tickets raised yet.
                   </td></tr>
                 )}
-                {tickets.map((t: any) => (
+                {paged.map((t: any) => (
                   <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{t.subject}</div>
@@ -83,6 +90,9 @@ export default function SupportPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="p-4 border-t border-slate-100">
+            <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
           </div>
         </Card>
       </div>
@@ -127,11 +137,15 @@ function RaiseTicketModal({ onClose, onDone }: { onClose: () => void; onDone: ()
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">Priority</label>
-            <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </Select>
+            <SearchableSelect
+              value={form.priority}
+              onChange={v => setForm({ ...form, priority: v })}
+              options={[
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" },
+              ]}
+            />
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">Description</label>
