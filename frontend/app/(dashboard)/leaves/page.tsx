@@ -4,11 +4,15 @@ import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Pagination } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api, fileUrl } from "@/lib/api";
 import { Plus, X, CheckCircle2, XCircle, CalendarDays, Search, Upload } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -38,6 +42,9 @@ export default function LeavesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [approvalSearch, setApprovalSearch] = useState("");
   const [calendarSearch, setCalendarSearch] = useState("");
+  const [myPage, setMyPage] = useState(1);
+  const [approvalsPage, setApprovalsPage] = useState(1);
+  const [calendarPage, setCalendarPage] = useState(1);
 
   // Show the Approvals tab for HR/Admin, and for any manager who has at least
   // one direct report — the backend scopes /requests/team accordingly.
@@ -66,6 +73,17 @@ export default function LeavesPage() {
   const filteredRequests = requests.filter(r => !statusFilter || r.status === statusFilter);
   const filteredPending = pending.filter(r => (r.employee_name || "").toLowerCase().includes(approvalSearch.toLowerCase()));
   const filteredCalendar = calendar.filter(c => (c.employee_name || "").toLowerCase().includes(calendarSearch.toLowerCase()));
+
+  const myTotalPages = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
+  const myPaged = filteredRequests.slice((myPage - 1) * PAGE_SIZE, myPage * PAGE_SIZE);
+  const approvalsTotalPages = Math.max(1, Math.ceil(filteredPending.length / PAGE_SIZE));
+  const approvalsPaged = filteredPending.slice((approvalsPage - 1) * PAGE_SIZE, approvalsPage * PAGE_SIZE);
+  const calendarTotalPages = Math.max(1, Math.ceil(filteredCalendar.length / PAGE_SIZE));
+  const calendarPaged = filteredCalendar.slice((calendarPage - 1) * PAGE_SIZE, calendarPage * PAGE_SIZE);
+
+  useEffect(() => { setMyPage(1); }, [statusFilter]);
+  useEffect(() => { setApprovalsPage(1); }, [approvalSearch, pending.length]);
+  useEffect(() => { setCalendarPage(1); }, [calendarSearch, calMonth, calYear]);
 
   const tabs: { key: typeof tab; label: string }[] = [
     { key: "my", label: "My Leaves" },
@@ -116,13 +134,19 @@ export default function LeavesPage() {
             <Card>
               <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                 <span className="font-medium text-slate-800">My Requests</span>
-                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="max-w-[160px]">
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
-                </Select>
+                <SearchableSelect
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  placeholder="All Status"
+                  className="max-w-[160px]"
+                  options={[
+                    { value: "", label: "All Status" },
+                    { value: "pending", label: "Pending" },
+                    { value: "approved", label: "Approved" },
+                    { value: "rejected", label: "Rejected" },
+                    { value: "cancelled", label: "Cancelled" },
+                  ]}
+                />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -139,7 +163,7 @@ export default function LeavesPage() {
                   </thead>
                   <tbody>
                     {filteredRequests.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">No leave requests match.</td></tr>}
-                    {filteredRequests.map(r => (
+                    {myPaged.map(r => (
                       <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1.5">
@@ -169,6 +193,9 @@ export default function LeavesPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="p-4 border-t border-slate-100">
+                <Pagination page={myPage} totalPages={myTotalPages} onChange={setMyPage}/>
+              </div>
             </Card>
           </div>
         )}
@@ -188,7 +215,7 @@ export default function LeavesPage() {
             {pending.length > 0 && filteredPending.length === 0 && (
               <Card className="p-10 text-center text-slate-400 text-sm">No requests match your search.</Card>
             )}
-            {filteredPending.map(r => (
+            {approvalsPaged.map(r => (
               <Card key={r.id} className="p-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-brand-100 text-brand-700 grid place-items-center font-semibold">
@@ -213,6 +240,9 @@ export default function LeavesPage() {
                 </div>
               </Card>
             ))}
+            {filteredPending.length > 0 && (
+              <Pagination page={approvalsPage} totalPages={approvalsTotalPages} onChange={setApprovalsPage}/>
+            )}
           </div>
         )}
 
@@ -220,12 +250,18 @@ export default function LeavesPage() {
         {tab === "calendar" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={calMonth} onChange={e => setCalMonth(+e.target.value)} className="max-w-[140px]">
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </Select>
-              <Select value={calYear} onChange={e => setCalYear(+e.target.value)} className="max-w-[120px]">
-                {[calYear + 1, calYear, calYear - 1].map(y => <option key={y} value={y}>{y}</option>)}
-              </Select>
+              <SearchableSelect
+                value={String(calMonth)}
+                onChange={v => setCalMonth(Number(v))}
+                className="max-w-[140px]"
+                options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))}
+              />
+              <SearchableSelect
+                value={String(calYear)}
+                onChange={v => setCalYear(Number(v))}
+                className="max-w-[120px]"
+                options={[calYear + 1, calYear, calYear - 1].map(y => ({ value: String(y), label: String(y) }))}
+              />
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                 <Input placeholder="Search employee…" value={calendarSearch} onChange={e => setCalendarSearch(e.target.value)} className="pl-8 max-w-[200px]" />
@@ -238,7 +274,7 @@ export default function LeavesPage() {
               </div>
               <div className="divide-y divide-slate-100">
                 {filteredCalendar.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">No approved leave match.</div>}
-                {filteredCalendar.map(c => (
+                {calendarPaged.map(c => (
                   <div key={c.id} className="px-4 py-3 flex items-center gap-3" style={{ borderLeft: `3px solid ${c.color}` }}>
                     <div className="flex-1">
                       <div className="text-sm font-medium text-slate-800">{c.employee_name}</div>
@@ -250,6 +286,9 @@ export default function LeavesPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="p-4 border-t border-slate-100">
+                <Pagination page={calendarPage} totalPages={calendarTotalPages} onChange={setCalendarPage}/>
               </div>
             </Card>
           </div>
@@ -309,22 +348,23 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
         <form onSubmit={submit} className="p-5 space-y-4">
           <div>
             <label className="text-xs font-medium text-slate-600">Leave Type</label>
-            <Select value={form.leave_type_id} onChange={e => setForm({ ...form, leave_type_id: e.target.value })} required>
-              {types.map((t: any) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}{balMap[t.id] ? ` (${balMap[t.id].available} left)` : ""}
-                </option>
-              ))}
-            </Select>
+            <SearchableSelect
+              value={form.leave_type_id}
+              onChange={v => setForm({ ...form, leave_type_id: v })}
+              options={types.map((t: any) => ({
+                value: t.id,
+                label: `${t.name}${balMap[t.id] ? ` (${balMap[t.id].available} left)` : ""}`,
+              }))}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">From</label>
-              <Input type="date" min={today} value={form.from_date} onChange={e => setForm({ ...form, from_date: e.target.value, to_date: form.half_day ? e.target.value : form.to_date })} required />
+              <DatePicker min={today} value={form.from_date} onChange={v => setForm({ ...form, from_date: v, to_date: form.half_day ? v : form.to_date })}/>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600">To</label>
-              <Input type="date" min={form.from_date || today} value={form.to_date} disabled={form.half_day} onChange={e => setForm({ ...form, to_date: e.target.value })} required />
+              <DatePicker min={form.from_date || today} value={form.to_date} disabled={form.half_day} onChange={v => setForm({ ...form, to_date: v })}/>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -332,10 +372,15 @@ function ApplyLeaveModal({ types, balances, onClose, onDone }: any) {
               onChange={e => setForm({ ...form, half_day: e.target.checked, to_date: e.target.checked ? form.from_date : form.to_date })} />
             <label htmlFor="half" className="text-sm text-slate-700">Half day</label>
             {form.half_day && (
-              <Select value={form.half_day_session} onChange={e => setForm({ ...form, half_day_session: e.target.value })} className="max-w-[160px] ml-auto">
-                <option value="first_half">First Half</option>
-                <option value="second_half">Second Half</option>
-              </Select>
+              <SearchableSelect
+                value={form.half_day_session}
+                onChange={v => setForm({ ...form, half_day_session: v })}
+                className="max-w-[160px] ml-auto"
+                options={[
+                  { value: "first_half", label: "First Half" },
+                  { value: "second_half", label: "Second Half" },
+                ]}
+              />
             )}
           </div>
           <div>
