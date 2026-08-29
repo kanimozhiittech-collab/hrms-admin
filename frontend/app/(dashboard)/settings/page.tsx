@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Topbar } from "@/components/topbar";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal, ModalField } from "@/components/ui/modal";
@@ -21,6 +23,7 @@ import {
 } from "lucide-react";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
+const LIST_PAGE_SIZE = 10;
 const ADMIN_ROLES = ["super_admin", "company_admin"];
 
 const SERVICES = [
@@ -224,6 +227,7 @@ function DepartmentsService() {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -237,6 +241,9 @@ function DepartmentsService() {
     d.name.toLowerCase().includes(search.toLowerCase()) ||
     (d.code || "").toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search]);
 
   function resetForm() {
     setForm({ name: "", code: "", mail_alias: "", lead_id: "", parent_id: "" });
@@ -299,7 +306,7 @@ function DepartmentsService() {
         {!loading && filtered.length === 0 && (
           <div className="px-4 py-10 text-center text-sm text-slate-400">No departments found.</div>
         )}
-        {filtered.map(d => (
+        {paged.map(d => (
           <div key={d.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{d.name}{d.code ? ` (${d.code})` : ""}</div>
@@ -319,6 +326,9 @@ function DepartmentsService() {
             )}
           </div>
         ))}
+      </div>
+      <div className="p-4 border-t border-slate-100">
+        <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
       </div>
 
       {showForm && (
@@ -343,17 +353,19 @@ function DepartmentsService() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <ModalField label="Department Head">
-              <Select value={form.lead_id} onChange={e => setForm(f => ({ ...f, lead_id: e.target.value }))}>
-                <option value="">Select</option>
-                {headOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </Select>
+              <SearchableSelect
+                value={form.lead_id}
+                onChange={v => setForm(f => ({ ...f, lead_id: v }))}
+                options={headOptions.map(o => ({ value: o.id, label: o.label }))}
+              />
               <p className="text-[11px] text-slate-400 mt-1">Only employees with a Manage Accounts login can be set as head.</p>
             </ModalField>
             <ModalField label="Parent Department">
-              <Select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}>
-                <option value="">Select</option>
-                {items.filter(d => d.id !== editingId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Select>
+              <SearchableSelect
+                value={form.parent_id}
+                onChange={v => setForm(f => ({ ...f, parent_id: v }))}
+                options={items.filter(d => d.id !== editingId).map(d => ({ value: d.id, label: d.name }))}
+              />
             </ModalField>
           </div>
         </Modal>
@@ -389,6 +401,7 @@ function DesignationsService() {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; count: number } | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -402,6 +415,9 @@ function DesignationsService() {
     d.title.toLowerCase().includes(search.toLowerCase()) ||
     (d.code || "").toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search]);
 
   function resetForm() {
     setForm({ title: "", code: "", mail_alias: "" });
@@ -459,7 +475,7 @@ function DesignationsService() {
         {!loading && filtered.length === 0 && (
           <div className="px-4 py-10 text-center text-sm text-slate-400">No designations found.</div>
         )}
-        {filtered.map(d => (
+        {paged.map(d => (
           <div key={d.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{d.title}{d.code ? ` (${d.code})` : ""}</div>
@@ -475,6 +491,9 @@ function DesignationsService() {
             )}
           </div>
         ))}
+      </div>
+      <div className="p-4 border-t border-slate-100">
+        <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
       </div>
 
       {showForm && (
@@ -537,6 +556,7 @@ function LocationsService() {
   const [form, setForm] = useState(BLANK_LOCATION);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -550,6 +570,9 @@ function LocationsService() {
     l.name.toLowerCase().includes(search.toLowerCase()) ||
     (l.city || "").toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search]);
 
   function resetForm() {
     setForm(BLANK_LOCATION);
@@ -603,7 +626,7 @@ function LocationsService() {
         {!loading && filtered.length === 0 && (
           <div className="px-4 py-10 text-center text-sm text-slate-400">No locations found.</div>
         )}
-        {filtered.map(l => (
+        {paged.map(l => (
           <div key={l.id} className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-slate-900">{l.name}{l.code ? ` (${l.code})` : ""}</div>
@@ -621,6 +644,9 @@ function LocationsService() {
             )}
           </div>
         ))}
+      </div>
+      <div className="p-4 border-t border-slate-100">
+        <Pagination page={page} totalPages={totalPages} onChange={setPage}/>
       </div>
 
       {showForm && (
@@ -656,20 +682,20 @@ function LocationsService() {
               </ModalField>
               <div className="grid grid-cols-2 gap-4">
                 <ModalField label="State">
-                  <Select value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value, city: "" }))}>
-                    <option value="">Select</option>
-                    {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </Select>
+                  <SearchableSelect
+                    value={form.state}
+                    onChange={v => setForm(f => ({ ...f, state: v, city: "" }))}
+                    options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                  />
                 </ModalField>
                 <ModalField label="District">
-                  <Select
+                  <SearchableSelect
                     value={form.city}
-                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                    onChange={v => setForm(f => ({ ...f, city: v }))}
                     disabled={!form.state}
-                  >
-                    <option value="">{form.state ? "Select" : "Select a state first"}</option>
-                    {(INDIA_STATE_DISTRICTS[form.state] || []).map(d => <option key={d} value={d}>{d}</option>)}
-                  </Select>
+                    placeholder={form.state ? "Select" : "Select a state first"}
+                    options={(INDIA_STATE_DISTRICTS[form.state] || []).map(d => ({ value: d, label: d }))}
+                  />
                 </ModalField>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2124,9 +2150,25 @@ function GeneralService() {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
+  );
+}
+
+function SettingsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [active, setActive] = useState<string | null>(null);
+  // The active service lives in the URL (?service=…) rather than local state,
+  // so a refresh — or a shared/bookmarked link — lands back on the same
+  // service instead of the Services grid.
+  const active = searchParams.get("service");
+
+  function setActive(key: string | null) {
+    router.push(key ? `/settings?service=${key}` : "/settings");
+  }
 
   useEffect(() => {
     api.me().then(m => {
