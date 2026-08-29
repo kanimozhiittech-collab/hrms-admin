@@ -1177,11 +1177,6 @@ function DashboardWidgets({ role }: { role: string | null }) {
                       <span className="font-semibold text-slate-900">{person.name}</span>
                     </p>
                     <p className="truncate text-xs text-slate-500">{person.role}</p>
-                    {person.ext && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                        <Phone className="h-3 w-3" /> {person.ext}
-                      </p>
-                    )}
                   </div>
                 </li>
               ))}
