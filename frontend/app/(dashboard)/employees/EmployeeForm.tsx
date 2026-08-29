@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray, FormProvider, useFormContext } from "react-hook-form";
+import { useForm, useFieldArray, FormProvider, useFormContext, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -10,10 +10,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect, type ComboOption } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api, fileUrl } from "@/lib/api";
+import { loadCustomOptions, addCustomOption } from "@/lib/custom-options";
 import { Plus, Trash2, Upload, Save, X, Eye, EyeOff } from "lucide-react";
 
 /* ---------- Schema ---------- */
@@ -174,6 +176,16 @@ const NATIONALITIES = [
   "Ukrainian","Uruguayan","Uzbek","Vanuatuan","Venezuelan","Vietnamese","Welsh","Yemeni","Zambian","Zimbabwean",
 ] as const;
 
+const PREFIXES = ["Mr", "Ms", "Mrs", "Dr"];
+const GENDERS = ["Male", "Female", "Other"];
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed"];
+const ACCOUNT_TYPES = ["Savings", "Current"];
+const EMPLOYEE_STATUSES = ["Active", "On Leave", "Inactive", "Resigned", "Terminated"];
+const RELATIONSHIP_TYPES = ["Spouse", "Child", "Father", "Mother", "Sibling", "Other"];
+const EMPLOYEE_TYPES = ["Permanent", "Contract", "Intern", "Trainee", "Consultant", "Freelancer"];
+const SOURCE_OF_HIRE = ["Referral", "LinkedIn", "Naukri", "Indeed", "Direct", "Agency", "Walk-in"];
+
 export const EMPLOYEE_FORM_DEFAULTS: EmployeeFormValues = {
   emp_code: "", first_name: "", last_name: "", work_email: "", password: "",
   employee_type: "Permanent", status: "Active", pay_frequency: "Monthly",
@@ -260,10 +272,61 @@ function TextField({ name, label, type = "text", placeholder, disabled, min, max
   );
 }
 
-function SelectField({ name, label, children }: any) {
-  const { register, formState: { errors } } = useFormContext();
+function toOptions(values: string[]): ComboOption[] {
+  return values.map((v) => ({ value: v, label: v }));
+}
+
+/** Merges a static option list with any values the user has previously
+ * added via that field's inline "+ Add" (persisted in this browser). */
+function useExtendableOptions(field: string, base: string[]): [ComboOption[], (v: string) => void] {
+  const [extra, setExtra] = useState<string[]>([]);
+  useEffect(() => { setExtra(loadCustomOptions(field)); }, [field]);
+  const values = Array.from(new Set([...base, ...extra]));
+  const add = (v: string) => {
+    addCustomOption(field, v);
+    setExtra((prev) => Array.from(new Set([...prev, v])));
+  };
+  return [toOptions(values), add];
+}
+
+function ComboField({ name, label, options, allowAdd, onAdd, placeholder }: any) {
+  const { control, formState: { errors } } = useFormContext();
   const err = (errors as any)[name]?.message;
-  return <Field label={label} error={err}><Select {...register(name)}>{children}</Select></Field>;
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <Field label={label} error={err}>
+          <SearchableSelect
+            name={name}
+            value={field.value || ""}
+            onChange={field.onChange}
+            options={options}
+            allowAdd={allowAdd}
+            onAdd={onAdd}
+            placeholder={placeholder || "—"}
+          />
+        </Field>
+      )}
+    />
+  );
+}
+
+function DateField({ name, label, min, max, disabled }: any) {
+  const { control, formState: { errors } } = useFormContext();
+  const err = (errors as any)[name]?.message;
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <Field label={label} error={err}>
+          <DatePicker name={name} value={field.value || ""} onChange={field.onChange} min={min} max={max} disabled={disabled}/>
+        </Field>
+      )}
+    />
+  );
 }
 
 function PasswordField({ name, label, placeholder, show, onToggle }: any) {
@@ -362,7 +425,11 @@ export function EmployeeForm({
   const [expFiles, setExpFiles] = useState<Record<number, File>>({});
   const [sameAsPresent, setSameAsPresent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showUan, setShowUan] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const [relationshipOptions, addRelationshipOption] = useExtendableOptions("relationship_type", RELATIONSHIP_TYPES);
+  const [employeeTypeOptions, addEmployeeTypeOption] = useExtendableOptions("employee_type", EMPLOYEE_TYPES);
+  const [sourceOfHireOptions, addSourceOfHireOption] = useExtendableOptions("source_of_hire", SOURCE_OF_HIRE);
 
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
@@ -560,27 +627,17 @@ export function EmployeeForm({
                       placeholder={mode === "create" ? "Auto-generated on save" : ""}
                       disabled={mode === "create"}
                     />
-                    <SelectField name="prefix" label="Prefix">
-                      <option value="">—</option><option>Mr</option><option>Ms</option><option>Mrs</option><option>Dr</option>
-                    </SelectField>
+                    <ComboField name="prefix" label="Prefix" options={toOptions(PREFIXES)}/>
                     <div/>
                     <TextField name="first_name" label="First Name *"/>
                     <TextField name="middle_name" label="Middle Name"/>
                     <TextField name="last_name" label="Last Name *"/>
                     <TextField name="display_name" label="Display Name"/>
-                    <SelectField name="gender" label="Gender *">
-                      <option value="">—</option><option>Male</option><option>Female</option><option>Other</option>
-                    </SelectField>
-                    <TextField name="date_of_birth" label="Date of Birth *" type="date" min="1900-01-01" max={todayStr}/>
-                    <SelectField name="blood_group" label="Blood Group *">
-                      <option value="">—</option>{["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(b=> <option key={b}>{b}</option>)}
-                    </SelectField>
-                    <SelectField name="marital_status" label="Marital Status *">
-                      <option value="">—</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
-                    </SelectField>
-                    <SelectField name="nationality" label="Nationality *">
-                      <option value="">—</option>{NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-                    </SelectField>
+                    <ComboField name="gender" label="Gender *" options={toOptions(GENDERS)}/>
+                    <DateField name="date_of_birth" label="Date of Birth *" min="1900-01-01" max={todayStr}/>
+                    <ComboField name="blood_group" label="Blood Group *" options={toOptions(BLOOD_GROUPS)}/>
+                    <ComboField name="marital_status" label="Marital Status *" options={toOptions(MARITAL_STATUSES)}/>
+                    <ComboField name="nationality" label="Nationality *" options={toOptions(NATIONALITIES as unknown as string[])}/>
                   </div>
 
                   <SectionHeader>Contact Details</SectionHeader>
@@ -645,13 +702,15 @@ export function EmployeeForm({
                     {depFA.fields.map((f, i) => (
                       <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-5 gap-3 relative">
                         <TextField name={`dependents.${i}.name`} label="Name *"/>
-                        <SelectField name={`dependents.${i}.relationship_type`} label="Relationship">
-                          <option value="">—</option>{["Spouse","Child","Father","Mother","Sibling","Other"].map(r=> <option key={r}>{r}</option>)}
-                        </SelectField>
-                        <TextField name={`dependents.${i}.date_of_birth`} label="Date of Birth" type="date"/>
-                        <SelectField name={`dependents.${i}.gender`} label="Gender">
-                          <option value="">—</option><option>Male</option><option>Female</option><option>Other</option>
-                        </SelectField>
+                        <ComboField
+                          name={`dependents.${i}.relationship_type`}
+                          label="Relationship"
+                          options={relationshipOptions}
+                          allowAdd
+                          onAdd={addRelationshipOption}
+                        />
+                        <DateField name={`dependents.${i}.date_of_birth`} label="Date of Birth" max={todayStr}/>
+                        <ComboField name={`dependents.${i}.gender`} label="Gender" options={toOptions(GENDERS)}/>
                         <button type="button" onClick={() => depFA.remove(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
                       </div>
                     ))}
@@ -663,7 +722,13 @@ export function EmployeeForm({
                     {emgFA.fields.map((f, i) => (
                       <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-4 gap-3 relative">
                         <TextField name={`emergency_contacts.${i}.name`} label="Name *"/>
-                        <TextField name={`emergency_contacts.${i}.relationship_type`} label="Relationship"/>
+                        <ComboField
+                          name={`emergency_contacts.${i}.relationship_type`}
+                          label="Relationship"
+                          options={relationshipOptions}
+                          allowAdd
+                          onAdd={addRelationshipOption}
+                        />
                         <TextField name={`emergency_contacts.${i}.mobile`} label="Mobile"/>
                         <TextField name={`emergency_contacts.${i}.address`} label="Address"/>
                         <button type="button" onClick={() => emgFA.remove(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
@@ -677,47 +742,54 @@ export function EmployeeForm({
                 <TabsContent value="job">
                   <SectionHeader first>Job Details</SectionHeader>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <SelectField name="department_id" label="Department *">
-                      <option value="">—</option>
-                      {meta.depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </SelectField>
-                    <SelectField name="designation_id" label="Designation *">
-                      <option value="">—</option>
-                      {meta.desigs.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-                    </SelectField>
-                    <SelectField name="employee_type" label="Employee Type">
-                      {["Permanent","Contract","Intern","Trainee","Consultant","Freelancer"].map(t=> <option key={t}>{t}</option>)}
-                    </SelectField>
-                    <TextField name="date_of_joining" label="Date of Joining *" type="date"/>
-                    <TextField name="probation_end_date" label="Probation End" type="date"/>
-                    <TextField name="confirmation_date" label="Confirmation Date" type="date"/>
-                    <SelectField name="reporting_manager_id" label="Reporting Manager">
-                      <option value="">—</option>
-                      {meta.managers.filter(m => m.id !== employeeId).map(m => <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>)}
-                    </SelectField>
-                    <SelectField name="work_location_id" label="Work Location *">
-                      <option value="">—</option>{meta.locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                    </SelectField>
-                    <SelectField name="shift_id" label="Shift">
-                      <option value="">—</option>{meta.shifts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.start_time}-{s.end_time})</option>)}
-                    </SelectField>
-                    <SelectField name="source_of_hire" label="Source of Hire">
-                      <option value="">—</option>{["Referral","LinkedIn","Naukri","Indeed","Direct","Agency","Walk-in"].map(s=> <option key={s}>{s}</option>)}
-                    </SelectField>
+                    <ComboField
+                      name="department_id"
+                      label="Department *"
+                      options={meta.depts.map((d: any) => ({ value: d.id, label: d.name }))}
+                    />
+                    <ComboField
+                      name="designation_id"
+                      label="Designation *"
+                      options={meta.desigs.map((d: any) => ({ value: d.id, label: d.title }))}
+                    />
+                    <ComboField
+                      name="employee_type"
+                      label="Employee Type"
+                      options={employeeTypeOptions}
+                      allowAdd
+                      onAdd={addEmployeeTypeOption}
+                    />
+                    <DateField name="date_of_joining" label="Date of Joining *"/>
+                    <DateField name="probation_end_date" label="Probation End"/>
+                    <DateField name="confirmation_date" label="Confirmation Date"/>
+                    <ComboField
+                      name="reporting_manager_id"
+                      label="Reporting Manager"
+                      options={meta.managers.filter((m: any) => m.id !== employeeId).map((m: any) => ({ value: m.id, label: `${m.emp_code} - ${m.first_name} ${m.last_name}` }))}
+                    />
+                    <ComboField
+                      name="work_location_id"
+                      label="Work Location *"
+                      options={meta.locs.map((l: any) => ({ value: l.id, label: l.name }))}
+                    />
+                    <ComboField
+                      name="shift_id"
+                      label="Shift"
+                      options={meta.shifts.map((s: any) => ({ value: s.id, label: `${s.name} (${s.start_time}-${s.end_time})` }))}
+                    />
+                    <ComboField
+                      name="source_of_hire"
+                      label="Source of Hire"
+                      options={sourceOfHireOptions}
+                      allowAdd
+                      onAdd={addSourceOfHireOption}
+                    />
                     <TextField name="tags" label="Tags (comma-separated)"/>
-                    <SelectField name="status" label="Status">
-                      {["Active","On Leave","Inactive","Resigned","Terminated"].map(s=> <option key={s}>{s}</option>)}
-                    </SelectField>
-                    <TextField name="exit_date" label="Exit Date" type="date"/>
+                    <ComboField name="status" label="Status" options={toOptions(EMPLOYEE_STATUSES)}/>
+                    <DateField name="exit_date" label="Exit Date"/>
                   </div>
 
                   <SectionHeader>Compensation & Statutory (India)</SectionHeader>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <TextField name="ctc" label="CTC (Annual)" type="number"/>
-                    <SelectField name="pay_frequency" label="Pay Frequency">
-                      {["Monthly","Weekly","Bi-Weekly","Hourly"].map(p=> <option key={p}>{p}</option>)}
-                    </SelectField>
-                  </div>
                   <div className="mt-6">
                     <div className="text-sm font-semibold text-slate-900 mb-3">Bank Details</div>
                     <div className="grid md:grid-cols-3 gap-4">
@@ -725,9 +797,7 @@ export function EmployeeForm({
                       <TextField name="bank_account_no" label="Account Number"/>
                       <TextField name="bank_ifsc" label="IFSC Code"/>
                       <TextField name="bank_branch" label="Branch"/>
-                      <SelectField name="bank_account_type" label="Account Type">
-                        <option value="">—</option><option>Savings</option><option>Current</option>
-                      </SelectField>
+                      <ComboField name="bank_account_type" label="Account Type" options={toOptions(ACCOUNT_TYPES)}/>
                     </div>
                   </div>
                   <div className="mt-6">
@@ -745,7 +815,7 @@ export function EmployeeForm({
                           existing={(initialValues as any)?.documents?.find?.((d: any) => d.doc_type === "Aadhaar")}
                           onSelect={(f) => setStatutoryFiles(s => ({ ...s, Aadhaar: f }))}/>
                       </div>
-                      <TextField name="uan_number" label="UAN"/>
+                      <PasswordField name="uan_number" label="UAN" show={showUan} onToggle={() => setShowUan(v => !v)}/>
                       <TextField name="pf_number" label="PF Number"/>
                       <TextField name="esi_number" label="ESI Number"/>
                       <div>
@@ -754,7 +824,7 @@ export function EmployeeForm({
                           existing={(initialValues as any)?.documents?.find?.((d: any) => d.doc_type === "Passport")}
                           onSelect={(f) => setStatutoryFiles(s => ({ ...s, Passport: f }))}/>
                       </div>
-                      <TextField name="passport_expiry" label="Passport Expiry" type="date"/>
+                      <DateField name="passport_expiry" label="Passport Expiry"/>
                     </div>
                   </div>
 
@@ -829,8 +899,8 @@ export function EmployeeForm({
                       <div key={f.id} className="p-4 border border-slate-200 rounded-lg grid md:grid-cols-4 gap-3 relative">
                         <TextField name={`experience.${i}.company_name`} label="Company"/>
                         <TextField name={`experience.${i}.designation`} label="Designation"/>
-                        <TextField name={`experience.${i}.from_date`} label="From" type="date"/>
-                        <TextField name={`experience.${i}.to_date`} label="To" type="date"/>
+                        <DateField name={`experience.${i}.from_date`} label="From"/>
+                        <DateField name={`experience.${i}.to_date`} label="To"/>
                         <div className="md:col-span-4">
                           <Label>Description</Label>
                           <Textarea {...methods.register(`experience.${i}.description`)}/>
