@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { tokenStore } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,12 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</Button>
           <p className="text-xs text-slate-500 text-center">
             Demo creds prefilled. <span className="font-medium">admin@peoplepulse.io / Admin@123</span>
+          </p>
+          <p className="text-center text-sm text-slate-500">
+            New company?{" "}
+            <Link href="/register" className="font-medium text-brand-600 underline">
+              Register here
+            </Link>
           </p>
         </form>
       </div>

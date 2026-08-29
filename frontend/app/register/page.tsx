@@ -112,7 +112,7 @@ export default function RegisterPage() {
               <Input id="adminName" required value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Senthil Kumar" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="adminEmail">Admin email</Label>
+              <Label htmlFor="adminEmail">Company email</Label>
               <Input id="adminEmail" type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value.toLowerCase())} placeholder="senthil@company.com" />
             </div>
             <div className="space-y-1.5">
