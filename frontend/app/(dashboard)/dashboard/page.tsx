@@ -1456,6 +1456,17 @@ function DashboardPageInner() {
 
   useEffect(() => { loadOverview(); }, [requestedTab]);
 
+  // Navigating here with a specific ?tab= (e.g. the topbar's Profile link)
+  // is an explicit choice and must win even after the very first load —
+  // the ref above only guards loadOverview()'s own fallback-tab logic from
+  // clobbering a tab the user already picked, not real tab-param changes.
+  useEffect(() => {
+    if (requestedTab) {
+      workTabInitialized.current = true;
+      setWorkTab(requestedTab);
+    }
+  }, [requestedTab]);
+
   function selectWorkTab(tab: string) {
     workTabInitialized.current = true;
     setWorkTab(tab);
