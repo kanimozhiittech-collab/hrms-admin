@@ -25,9 +25,18 @@ const STATUS_LABEL: Record<string, string> = {
   Present: "Present", Absent: "Absent", Half_Day: "Half Day", On_Leave: "On Leave", Holiday: "Holiday", Weekend: "Weekend",
 };
 
+/** The backend stores these as naive UTC (no trailing Z/offset), which the
+ * browser's Date parser otherwise treats as already-local — silently
+ * shifting every check-in/out time by the viewer's UTC offset (5:30 early
+ * for IST). Tag it as UTC explicitly before parsing. */
+function parseServerDateTime(v: string): Date {
+  const hasTz = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(v);
+  return new Date(hasTz ? v : `${v.replace(" ", "T")}Z`);
+}
+
 function fmtTime(dt?: string) {
   if (!dt) return "—";
-  return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return parseServerDateTime(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 /** "3h 34m" instead of "3.57h" — and drops the "0h"/"0m" side entirely when
