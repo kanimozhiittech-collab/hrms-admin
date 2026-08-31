@@ -61,7 +61,7 @@ export function Sidebar() {
 
   const sidebarContent = (
     <aside className={cn(
-      "flex flex-col bg-slate-900 text-slate-100 min-h-screen transition-[width] duration-150",
+      "flex flex-col bg-slate-900 text-slate-100 h-full transition-[width] duration-150",
       // Desktop: collapsible width
       collapsed ? "md:w-[68px]" : "md:w-64",
       // Mobile: always full nav width
