@@ -752,6 +752,17 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+/** `d.toISOString()` converts to UTC first — for any timezone ahead of UTC
+ * (IST included), a local midnight rolls back to the previous UTC day, so
+ * every date key came out one day early. This reads the local
+ * year/month/day components directly instead, with no UTC round-trip. */
+function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function buildMonthGrid(year: number, month: number) {
   const first = new Date(year, month - 1, 1);
   const startWeekday = first.getDay();
@@ -761,7 +772,7 @@ function buildMonthGrid(year: number, month: number) {
   for (let i = 0; i < totalCells; i++) {
     const d = new Date(year, month - 1, 1 - startWeekday + i);
     cells.push({
-      key: d.toISOString().slice(0, 10),
+      key: localDateKey(d),
       day: d.getDate(),
       muted: d.getMonth() !== month - 1,
       weekend: d.getDay() === 0 || d.getDay() === 6,
@@ -843,7 +854,7 @@ function CreateMeetingModal({ date, onClose, onDone }: { date: string; onClose: 
 
 function CalendarPanel() {
   const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
+  const todayKey = localDateKey(today);
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
   const [meetings, setMeetings] = useState<any[]>([]);
@@ -1103,7 +1114,7 @@ function DashboardWidgets({ role }: { role: string | null }) {
       if (!m.employee_id) return;
       return api.getEmployee(m.employee_id).then(emp => setEmployeeFiles(emp.documents || []));
     }).catch(() => {});
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = localDateKey(new Date());
     api.holidays(new Date().getFullYear())
       .then(rows => setUpcomingHolidays(rows.filter((h: any) => h.holiday_date >= todayKey).slice(0, 5)))
       .catch(() => {});
@@ -1523,7 +1534,6 @@ function DashboardPageInner() {
               "linear-gradient(rgba(0,0,0,.15), rgba(0,0,0,.15)), url('https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1600&q=80')",
           }}
         />
-        <MoreMenu onRefresh={loadOverview} className="absolute right-4 top-4"/>
 
         <main className={cn("-mt-5 flex flex-col gap-2 px-4 pb-6 lg:px-10", mainTab === "overview" && "lg:flex-row")}>
           {mainTab === "overview" && overview && (
