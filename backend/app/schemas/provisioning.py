@@ -12,3 +12,6 @@ class ProvisionCompanyIn(BaseModel):
 
 class ResetAdminPasswordIn(BaseModel):
     new_password: str
+
+class SyncLogoIn(BaseModel):
+    logo_url: str

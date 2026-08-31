@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from ..core.config import settings
 from ..core.security import hash_password
 from ..database import get_db
-from ..models import Company, Employee, Shift, User, WorkLocation
-from ..schemas import ProvisionCompanyIn, ResetAdminPasswordIn
+from ..models import Company, Department, Designation, Employee, Shift, User, WorkLocation
+from ..schemas import ProvisionCompanyIn, ResetAdminPasswordIn, SyncLogoIn
 from ..seed import _add_holidays, _add_leave_types
 
 router = APIRouter(prefix="/api/provisioning", tags=["provisioning"])
@@ -48,6 +48,11 @@ def provision_company(body: ProvisionCompanyIn, db: Session = Depends(get_db)):
 
     db.add(WorkLocation(company_id=company.id, name="Head Office"))
     db.add(Shift(company_id=company.id, name="General", start_time="09:30", end_time="18:30"))
+    # Without at least one of each, a brand-new admin can't save any employee
+    # at all (both are required fields) until they discover Settings on
+    # their own — seed one sensible default so Add Employee works day one.
+    db.add(Department(company_id=company.id, name="General"))
+    db.add(Designation(company_id=company.id, title="Employee"))
     _add_leave_types(db, company.id)
     _add_holidays(db, company.id)
 
@@ -74,6 +79,19 @@ def reset_admin_password(super_admin_company_id: int, body: ResetAdminPasswordIn
     admin.password_hash = hash_password(body.new_password)
     db.commit()
     return {"status": "updated", "email": admin.email}
+
+
+@router.put("/companies/{super_admin_company_id}/logo", dependencies=[Depends(_require_provision_secret)])
+def sync_logo(super_admin_company_id: int, body: SyncLogoIn, db: Session = Depends(get_db)):
+    """Called by the Super Admin app after it uploads a company's logo, so the
+    tenant's own sidebar shows it too — the two apps keep separate Company
+    rows, and this one is what the tenant's login actually reads from."""
+    company = db.query(Company).filter(Company.super_admin_company_id == super_admin_company_id).first()
+    if not company:
+        raise HTTPException(404, "Company not found")
+    company.logo_url = body.logo_url
+    db.commit()
+    return {"status": "updated"}
 
 
 @router.delete("/companies", dependencies=[Depends(_require_provision_secret)])

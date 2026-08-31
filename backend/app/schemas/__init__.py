@@ -15,7 +15,7 @@ from .leave import (
     LeaveTypeIn, LeaveTypeOut, LeaveBalanceOut, LeaveRequestIn, LeaveRequestOut,
     LeaveReview, LeaveCalendarItem, LeaveApprovalConfigIn, LeaveApprovalConfigOut,
 )
-from .provisioning import ProvisionCompanyIn, ResetAdminPasswordIn
+from .provisioning import ProvisionCompanyIn, ResetAdminPasswordIn, SyncLogoIn
 from .user import UserCreateIn, UserRoleUpdateIn, UserProfileUpdateIn, UserOut, UserCreateOut
 from .services import (
     OrgFileOut,
