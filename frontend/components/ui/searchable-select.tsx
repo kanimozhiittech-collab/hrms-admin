@@ -24,13 +24,18 @@ export function SearchableSelect({
   options: ComboOption[];
   placeholder?: string;
   allowAdd?: boolean;
-  onAdd?: (label: string) => void;
+  /** Called when the user adds a new option. Return the new option's real
+   * value (e.g. a database id) to select that instead of the typed label —
+   * needed whenever `value` isn't just the label itself (real master-data
+   * records vs. free-text classifications kept in localStorage). */
+  onAdd?: (label: string) => void | string | Promise<void | string>;
   disabled?: boolean;
   className?: string;
   name?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,15 +102,22 @@ export function SearchableSelect({
             {allowAdd && q && !exactMatch && (
               <button
                 type="button"
-                onClick={() => {
-                  onAdd?.(query.trim());
-                  onChange(query.trim());
-                  setOpen(false);
-                  setQuery("");
+                disabled={adding}
+                onClick={async () => {
+                  const label = query.trim();
+                  setAdding(true);
+                  try {
+                    const result = await onAdd?.(label);
+                    onChange(typeof result === "string" ? result : label);
+                    setOpen(false);
+                    setQuery("");
+                  } finally {
+                    setAdding(false);
+                  }
                 }}
-                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50"
+                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50 disabled:opacity-50"
               >
-                <Plus className="h-3.5 w-3.5"/> Add &quot;{query.trim()}&quot;
+                <Plus className="h-3.5 w-3.5"/> {adding ? "Adding…" : `Add "${query.trim()}"`}
               </button>
             )}
           </div>

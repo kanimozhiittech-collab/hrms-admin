@@ -251,10 +251,18 @@ function Field({ label, error, children }: any) {
   );
 }
 
-function TextField({ name, label, type = "text", placeholder, disabled, min, max, blockAlpha }: any) {
+function TextField({ name, label, type = "text", placeholder, disabled, min, max, blockAlpha, maxLength, lowercase }: any) {
   const { register, formState: { errors }, setValue } = useFormContext();
   const err = (errors as any)[name]?.message;
   const field = register(name);
+  const needsTransform = blockAlpha || lowercase || maxLength;
+  function transform(raw: string) {
+    let v = raw;
+    if (blockAlpha) v = v.replace(/[a-zA-Z]/g, "");
+    if (lowercase) v = v.toLowerCase();
+    if (maxLength) v = v.slice(0, maxLength);
+    return v;
+  }
   return (
     <Field label={label} error={err}>
       <Input
@@ -263,9 +271,15 @@ function TextField({ name, label, type = "text", placeholder, disabled, min, max
         disabled={disabled}
         min={min}
         max={max}
+        // Native maxLength truncates the raw typed/pasted text before our
+        // onChange ever sees it — combined with blockAlpha that can leave
+        // fewer than `maxLength` digits (e.g. letters mixed into a pasted
+        // number get cut off first). The length cap is applied ourselves
+        // inside transform() instead, after stripping.
+        maxLength={needsTransform ? undefined : maxLength}
         {...field}
-        onChange={blockAlpha ? (e: any) => {
-          setValue(name, e.target.value.replace(/[a-zA-Z]/g, ""), { shouldValidate: true });
+        onChange={needsTransform ? (e: any) => {
+          setValue(name, transform(e.target.value), { shouldValidate: true });
         } : field.onChange}
       />
     </Field>
@@ -435,6 +449,21 @@ export function EmployeeForm({
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
       .then(([depts, desigs, locs, shifts, empRes]) => setMeta({ depts, desigs, locs, shifts, managers: empRes.items || [] }));
   }, []);
+
+  /** A brand-new company has no departments/designations yet — both are
+   * required to save an employee, so without this a new admin is stuck
+   * unable to add anyone until they first find Settings > Organization
+   * Setup on their own. Creating one inline unblocks that immediately. */
+  async function addNewDepartment(name: string) {
+    const dept = await api.createDepartment({ name });
+    setMeta((m) => ({ ...m, depts: [...m.depts, dept] }));
+    return dept.id as string;
+  }
+  async function addNewDesignation(title: string) {
+    const desig = await api.createDesignation({ title });
+    setMeta((m) => ({ ...m, desigs: [...m.desigs, desig] }));
+    return desig.id as string;
+  }
 
   const methods = useForm<EmployeeFormValues>({
     resolver: zodResolver(schema) as any,
@@ -642,10 +671,10 @@ export function EmployeeForm({
 
                   <SectionHeader>Contact Details</SectionHeader>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <TextField name="work_email" label="Work Email *" type="email"/>
-                    <TextField name="personal_email" label="Personal Email" type="email"/>
-                    <TextField name="mobile" label="Mobile *" placeholder="+91 …" blockAlpha/>
-                    <TextField name="alt_phone" label="Alternate Phone" blockAlpha/>
+                    <TextField name="work_email" label="Work Email *" type="email" lowercase/>
+                    <TextField name="personal_email" label="Personal Email" type="email" lowercase/>
+                    <TextField name="mobile" label="Mobile *" placeholder="+91 …" blockAlpha maxLength={10}/>
+                    <TextField name="alt_phone" label="Alternate Phone" blockAlpha maxLength={10}/>
                     <div>
                       <PasswordField
                         name="password"
@@ -729,7 +758,7 @@ export function EmployeeForm({
                           allowAdd
                           onAdd={addRelationshipOption}
                         />
-                        <TextField name={`emergency_contacts.${i}.mobile`} label="Mobile"/>
+                        <TextField name={`emergency_contacts.${i}.mobile`} label="Mobile" blockAlpha maxLength={10}/>
                         <TextField name={`emergency_contacts.${i}.address`} label="Address"/>
                         <button type="button" onClick={() => emgFA.remove(i)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4"/></button>
                       </div>
@@ -746,11 +775,15 @@ export function EmployeeForm({
                       name="department_id"
                       label="Department *"
                       options={meta.depts.map((d: any) => ({ value: d.id, label: d.name }))}
+                      allowAdd
+                      onAdd={addNewDepartment}
                     />
                     <ComboField
                       name="designation_id"
                       label="Designation *"
                       options={meta.desigs.map((d: any) => ({ value: d.id, label: d.title }))}
+                      allowAdd
+                      onAdd={addNewDesignation}
                     />
                     <ComboField
                       name="employee_type"
@@ -874,8 +907,8 @@ export function EmployeeForm({
                         <div className="md:col-span-2"><TextField name={`education.${i}.institute`} label="Institute"/></div>
                         <TextField name={`education.${i}.degree`} label="Degree"/>
                         <TextField name={`education.${i}.specialization`} label="Specialization"/>
-                        <TextField name={`education.${i}.year_from`} label="From" type="number"/>
-                        <TextField name={`education.${i}.year_to`} label="To" type="number"/>
+                        <TextField name={`education.${i}.year_from`} label="From" type="number" maxLength={4}/>
+                        <TextField name={`education.${i}.year_to`} label="To" type="number" maxLength={4}/>
                         <TextField name={`education.${i}.grade`} label="Grade"/>
                         <div className="md:col-span-6">
                           <RowFileUpload
