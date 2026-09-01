@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api, fileUrl } from "@/lib/api";
 import { loadCustomOptions, addCustomOption } from "@/lib/custom-options";
+import { INDIA_STATE_DISTRICTS } from "@/lib/india-states-districts";
 import { Plus, Trash2, Upload, Save, X, Eye, EyeOff } from "lucide-react";
 
 /* ---------- Schema ---------- */
@@ -176,6 +177,7 @@ const NATIONALITIES = [
   "Ukrainian","Uruguayan","Uzbek","Vanuatuan","Venezuelan","Vietnamese","Welsh","Yemeni","Zambian","Zimbabwean",
 ] as const;
 
+const INDIAN_STATES = Object.keys(INDIA_STATE_DISTRICTS);
 const PREFIXES = ["Mr", "Ms", "Mrs", "Dr"];
 const GENDERS = ["Male", "Female", "Other"];
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -303,7 +305,7 @@ function useExtendableOptions(field: string, base: string[]): [ComboOption[], (v
   return [toOptions(values), add];
 }
 
-function ComboField({ name, label, options, allowAdd, onAdd, placeholder }: any) {
+function ComboField({ name, label, options, allowAdd, onAdd, placeholder, disabled, onValueChange }: any) {
   const { control, formState: { errors } } = useFormContext();
   const err = (errors as any)[name]?.message;
   return (
@@ -315,11 +317,12 @@ function ComboField({ name, label, options, allowAdd, onAdd, placeholder }: any)
           <SearchableSelect
             name={name}
             value={field.value || ""}
-            onChange={field.onChange}
+            onChange={(v) => { field.onChange(v); onValueChange?.(v); }}
             options={options}
             allowAdd={allowAdd}
             onAdd={onAdd}
             placeholder={placeholder || "—"}
+            disabled={disabled}
           />
         </Field>
       )}
@@ -717,8 +720,20 @@ export function EmployeeForm({
                         <TextField name={`addresses.${i}.line1`} label="Address Line 1 *" disabled={i===1 && sameAsPresent}/>
                         <TextField name={`addresses.${i}.line2`} label="Address Line 2" disabled={i===1 && sameAsPresent}/>
                         <div className="grid grid-cols-2 gap-3">
-                          <TextField name={`addresses.${i}.city`} label="City *" disabled={i===1 && sameAsPresent}/>
-                          <TextField name={`addresses.${i}.state`} label="State *" disabled={i===1 && sameAsPresent}/>
+                          <ComboField
+                            name={`addresses.${i}.state`}
+                            label="State *"
+                            options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                            disabled={i===1 && sameAsPresent}
+                            onValueChange={() => methods.setValue(`addresses.${i}.city`, "")}
+                          />
+                          <ComboField
+                            name={`addresses.${i}.city`}
+                            label="City *"
+                            options={(INDIA_STATE_DISTRICTS[methods.watch(`addresses.${i}.state`)] || []).map(c => ({ value: c, label: c }))}
+                            disabled={(i===1 && sameAsPresent) || !methods.watch(`addresses.${i}.state`)}
+                            placeholder={methods.watch(`addresses.${i}.state`) ? "—" : "Select a state first"}
+                          />
                           <TextField name={`addresses.${i}.country`} label="Country *" disabled={i===1 && sameAsPresent}/>
                           <TextField name={`addresses.${i}.pincode`} label="Pincode *" disabled={i===1 && sameAsPresent}/>
                         </div>
