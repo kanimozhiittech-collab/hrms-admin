@@ -96,8 +96,15 @@ export default function EmployeeDetailPage() {
   }, [employeeId]);
 
   useEffect(() => {
-    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts(), api.listEmployees({ page_size: 100 })])
-      .then(([depts, desigs, locs, shifts, empRes]) => setMeta({ depts, desigs, locs, shifts, allEmployees: empRes.items || [] }));
+    // The employee directory (listEmployees) is HR-only — someone viewing their
+    // own profile would 403 on it, which must not also blank out the
+    // department/designation/location/shift names (open to everyone) that
+    // share this load.
+    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
+      .then(([depts, desigs, locs, shifts]) => setMeta((m) => ({ ...m, depts, desigs, locs, shifts })));
+    api.listEmployees({ page_size: 100 })
+      .then((empRes) => setMeta((m) => ({ ...m, allEmployees: empRes.items || [] })))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -198,7 +205,7 @@ export default function EmployeeDetailPage() {
             </h2>
             {employee && <p className="text-sm text-slate-500">{employee.emp_code} · {employee.work_email}</p>}
           </div>
-          {employee && (
+          {employee && isHR && (
             <Link href={`/employees/${employeeId}/edit`}>
               <Button type="button" variant="outline">
                 <Pencil className="h-4 w-4" />Edit
@@ -256,56 +263,58 @@ export default function EmployeeDetailPage() {
                 ]}
               />
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reporting Manager &amp; Team</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-end gap-3">
-                    <div className="flex-1 space-y-1.5">
-                      <Label>Reporting Manager</Label>
-                      <Select value={managerId} onChange={(event) => setManagerId(event.target.value)}>
-                        <option value="">— None —</option>
-                        {meta.allEmployees.filter(m => m.id !== employeeId).map(m => (
-                          <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={saveManager}
-                      disabled={savingManager || managerId === (employee.reporting_manager_id || "")}
-                    >
-                      {savingManager ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
-                  {manager && (
-                    <p className="text-xs text-slate-500">
-                      Currently reports to <span className="font-medium text-slate-700">{manager.first_name} {manager.last_name}</span>.
-                    </p>
-                  )}
-
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-slate-500">Direct Reports ({directReports.length})</p>
-                    {directReports.length ? (
-                      <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
-                        {directReports.map(r => (
-                          <Link
-                            key={r.id}
-                            href={`/employees/${r.id}`}
-                            className="flex items-center justify-between p-3 text-sm hover:bg-slate-50"
-                          >
-                            <span className="font-medium text-slate-900">{r.first_name} {r.last_name}</span>
-                            <span className="text-xs text-slate-500">{r.designation || r.emp_code}</span>
-                          </Link>
-                        ))}
+              {isHR && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Reporting Manager &amp; Team</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <Label>Reporting Manager</Label>
+                        <Select value={managerId} onChange={(event) => setManagerId(event.target.value)}>
+                          <option value="">— None —</option>
+                          {meta.allEmployees.filter(m => m.id !== employeeId).map(m => (
+                            <option key={m.id} value={m.id}>{m.emp_code} - {m.first_name} {m.last_name}</option>
+                          ))}
+                        </Select>
                       </div>
-                    ) : (
-                      <EmptyBlock text="No one reports to this employee yet." />
+                      <Button
+                        type="button"
+                        onClick={saveManager}
+                        disabled={savingManager || managerId === (employee.reporting_manager_id || "")}
+                      >
+                        {savingManager ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    {manager && (
+                      <p className="text-xs text-slate-500">
+                        Currently reports to <span className="font-medium text-slate-700">{manager.first_name} {manager.last_name}</span>.
+                      </p>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-slate-500">Direct Reports ({directReports.length})</p>
+                      {directReports.length ? (
+                        <div className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                          {directReports.map(r => (
+                            <Link
+                              key={r.id}
+                              href={`/employees/${r.id}`}
+                              className="flex items-center justify-between p-3 text-sm hover:bg-slate-50"
+                            >
+                              <span className="font-medium text-slate-900">{r.first_name} {r.last_name}</span>
+                              <span className="text-xs text-slate-500">{r.designation || r.emp_code}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyBlock text="No one reports to this employee yet." />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {isHR && (
                 <Card>
