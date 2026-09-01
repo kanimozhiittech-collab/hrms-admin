@@ -35,6 +35,7 @@ function nameOf(list: any[], id: string | null, field = "name") {
 
 export default function AccountPage() {
   const [me, setMe] = useState<any>(null);
+  const [meLoading, setMeLoading] = useState(true);
   const [employee, setEmployee] = useState<any>(null);
   const [meta, setMeta] = useState<{ depts: any[]; desigs: any[]; locs: any[]; shifts: any[] }>({ depts: [], desigs: [], locs: [], shifts: [] });
   const [photoFailed, setPhotoFailed] = useState(false);
@@ -43,7 +44,7 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
+  useEffect(() => { api.me().then(setMe).catch(() => {}).finally(() => setMeLoading(false)); }, []);
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
       .then(([depts, desigs, locs, shifts]) => setMeta({ depts, desigs, locs, shifts }));
@@ -77,14 +78,20 @@ export default function AccountPage() {
   return (
     <>
       <Topbar title="My Profile" />
-      <div className="max-w-3xl space-y-4 p-4 lg:p-6">
+      <div className="space-y-4 p-4 lg:p-6">
         <Card>
           <CardHeader>
             <CardTitle>Account Details</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field label="Email" value={me?.email} />
-            <Field label="Role" value={me ? ROLE_LABELS[me.role] ?? me.role : undefined} />
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {meLoading ? (
+              <p className="text-sm text-slate-400">Loading…</p>
+            ) : (
+              <>
+                <Field label="Email" value={me?.email} />
+                <Field label="Role" value={me ? ROLE_LABELS[me.role] ?? me.role : undefined} />
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -103,7 +110,7 @@ export default function AccountPage() {
                   <p className="text-xs text-slate-500">{employee.emp_code} · {employee.work_email}</p>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Gender" value={employee.gender} />
                 <Field label="Date of Birth" value={employee.date_of_birth} />
                 <Field label="Blood Group" value={employee.blood_group} />
@@ -133,7 +140,7 @@ export default function AccountPage() {
             <CardTitle>Change Password</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={changePassword} className="grid gap-4 sm:grid-cols-2">
+            <form onSubmit={changePassword} className="grid max-w-xl gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Current Password</Label>
                 <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
