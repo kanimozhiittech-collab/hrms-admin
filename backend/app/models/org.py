@@ -87,13 +87,3 @@ class User(Base):
     assigned_department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
-    # Personal details for logins with no linked Employee record (super_admin/
-    # company_admin/hr_manager) -- shown/edited on their own My Profile page.
-    name: Mapped[str | None] = mapped_column(String(150), nullable=True)
-    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    address_line1: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    address_line2: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)

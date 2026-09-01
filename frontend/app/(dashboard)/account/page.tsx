@@ -33,31 +33,21 @@ function nameOf(list: any[], id: string | null, field = "name") {
   return list.find((x) => x.id === id)?.[field];
 }
 
-const BLANK_PROFILE = { name: "", phone: "", address_line1: "", address_line2: "", city: "", state: "", country: "", postal_code: "" };
-
 export default function AccountPage() {
   const [me, setMe] = useState<any>(null);
   const [meLoading, setMeLoading] = useState(true);
+  const [company, setCompany] = useState<any>(null);
   const [employee, setEmployee] = useState<any>(null);
   const [meta, setMeta] = useState<{ depts: any[]; desigs: any[]; locs: any[]; shifts: any[] }>({ depts: [], desigs: [], locs: [], shifts: [] });
+  const [logoFailed, setLogoFailed] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [profileForm, setProfileForm] = useState(BLANK_PROFILE);
-  const [savingProfile, setSavingProfile] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    api.me().then((m) => {
-      setMe(m);
-      setProfileForm({
-        name: m.name || "", phone: m.phone || "",
-        address_line1: m.address_line1 || "", address_line2: m.address_line2 || "",
-        city: m.city || "", state: m.state || "", country: m.country || "", postal_code: m.postal_code || "",
-      });
-    }).catch(() => {}).finally(() => setMeLoading(false));
-  }, []);
+  useEffect(() => { api.me().then(setMe).catch(() => {}).finally(() => setMeLoading(false)); }, []);
+  useEffect(() => { api.getCompany().then(setCompany).catch(() => {}); }, []);
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
       .then(([depts, desigs, locs, shifts]) => setMeta({ depts, desigs, locs, shifts }));
@@ -65,20 +55,6 @@ export default function AccountPage() {
   useEffect(() => {
     if (me?.employee_id) api.getEmployee(me.employee_id).then(setEmployee).catch(() => {});
   }, [me?.employee_id]);
-
-  async function saveProfile(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingProfile(true);
-    try {
-      const updated = await api.updateMe(profileForm);
-      setMe(updated);
-      toast.success("Profile updated");
-    } catch (error: any) {
-      toast.error(error.message || "Unable to update profile");
-    } finally {
-      setSavingProfile(false);
-    }
-  }
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -124,56 +100,6 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
-        {me && !me.employee_id && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Phone</Label>
-                  <Input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} />
-                </div>
-                <div />
-                <div className="space-y-1.5">
-                  <Label>Address Line 1</Label>
-                  <Input value={profileForm.address_line1} onChange={(e) => setProfileForm((f) => ({ ...f, address_line1: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Address Line 2</Label>
-                  <Input value={profileForm.address_line2} onChange={(e) => setProfileForm((f) => ({ ...f, address_line2: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>City</Label>
-                  <Input value={profileForm.city} onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>State</Label>
-                  <Input value={profileForm.state} onChange={(e) => setProfileForm((f) => ({ ...f, state: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Country</Label>
-                  <Input value={profileForm.country} onChange={(e) => setProfileForm((f) => ({ ...f, country: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>ZIP/PIN Code</Label>
-                  <Input value={profileForm.postal_code} onChange={(e) => setProfileForm((f) => ({ ...f, postal_code: e.target.value }))} />
-                </div>
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <Button type="submit" disabled={savingProfile}>
-                    {savingProfile ? "Saving…" : "Save"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
         {employee && (
           <Card>
             <CardHeader>
@@ -209,6 +135,38 @@ export default function AccountPage() {
                 <a href={`/employees/${employee.id}`} className="text-sm text-brand-600 hover:underline">
                   View full employee profile (address, bank, documents, education, experience) →
                 </a>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {company && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Organization Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex items-center gap-3">
+                {company.logo_url && !logoFailed
+                  ? <img src={fileUrl(company.logo_url)} alt="Logo" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" onError={() => setLogoFailed(true)}/>
+                  : <div className="grid h-14 w-14 place-items-center rounded-lg bg-slate-100 text-[10px] text-slate-300">No logo</div>}
+                <p className="text-sm font-semibold text-slate-900">{company.name}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Website" value={company.website} />
+                <Field label="Type of Organization" value={company.org_type} />
+                <Field label="Contact Person" value={company.contact_person} />
+                <Field label="Contact Number" value={company.contact_number} />
+                <Field label="Alternate Contact Number" value={company.alt_contact_number} />
+                <Field label="Contact Email" value={company.contact_email} />
+                <Field label="GST Number" value={company.gst_number} />
+                <Field label="PAN Number" value={company.pan_number} />
+                <Field label="Address Line 1" value={company.address_line1} />
+                <Field label="Address Line 2" value={company.address_line2} />
+                <Field label="City" value={company.city} />
+                <Field label="State" value={company.state} />
+                <Field label="Country" value={company.country} />
+                <Field label="ZIP/PIN Code" value={company.postal_code} />
               </div>
             </CardContent>
           </Card>

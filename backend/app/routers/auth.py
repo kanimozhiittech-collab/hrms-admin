@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
-from ..schemas import LoginIn, TokenOut, Me, ChangePasswordIn, UpdateMeIn
+from ..schemas import LoginIn, TokenOut, Me, ChangePasswordIn
 from ..core.security import verify_password, create_token, hash_password
 from .deps import current_user
 
@@ -18,25 +18,11 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     token = create_token(user.id, {"role": user.role, "company_id": user.company_id})
     return TokenOut(access_token=token)
 
-def _to_me(user: User) -> Me:
-    return Me(id=user.id, email=user.email, role=user.role,
-              company_id=user.company_id, employee_id=user.employee_id,
-              is_active=user.is_active, created_at=user.created_at,
-              name=user.name, phone=user.phone,
-              address_line1=user.address_line1, address_line2=user.address_line2,
-              city=user.city, state=user.state, country=user.country, postal_code=user.postal_code)
-
 @router.get("/me", response_model=Me)
 def me(user: User = Depends(current_user)):
-    return _to_me(user)
-
-@router.put("/me", response_model=Me)
-def update_me(body: UpdateMeIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    for k, v in body.model_dump().items():
-        setattr(user, k, v)
-    db.commit()
-    db.refresh(user)
-    return _to_me(user)
+    return Me(id=user.id, email=user.email, role=user.role,
+              company_id=user.company_id, employee_id=user.employee_id,
+              is_active=user.is_active, created_at=user.created_at)
 
 @router.put("/me/password", status_code=204)
 def change_my_password(body: ChangePasswordIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
