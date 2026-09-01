@@ -21,7 +21,8 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 @router.get("/me", response_model=Me)
 def me(user: User = Depends(current_user)):
     return Me(id=user.id, email=user.email, role=user.role,
-              company_id=user.company_id, employee_id=user.employee_id)
+              company_id=user.company_id, employee_id=user.employee_id,
+              is_active=user.is_active, created_at=user.created_at)
 
 @router.put("/me/password", status_code=204)
 def change_my_password(body: ChangePasswordIn, db: Session = Depends(get_db), user: User = Depends(current_user)):

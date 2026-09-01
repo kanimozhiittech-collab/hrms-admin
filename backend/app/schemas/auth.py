@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -14,6 +15,8 @@ class Me(BaseModel):
     role: str
     company_id: str
     employee_id: str | None = None
+    is_active: bool
+    created_at: datetime
 
 class ChangePasswordIn(BaseModel):
     current_password: str

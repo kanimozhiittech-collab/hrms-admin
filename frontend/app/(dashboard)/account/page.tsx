@@ -90,6 +90,8 @@ export default function AccountPage() {
               <>
                 <Field label="Email" value={me?.email} />
                 <Field label="Role" value={me ? ROLE_LABELS[me.role] ?? me.role : undefined} />
+                <Field label="Status" value={me ? (me.is_active ? "Active" : "Inactive") : undefined} />
+                <Field label="Member Since" value={me?.created_at ? new Date(me.created_at).toLocaleDateString() : undefined} />
               </>
             )}
           </CardContent>
