@@ -80,6 +80,7 @@ export const api = {
       method: "POST", body: JSON.stringify({ email, password }),
     }),
   me: () => request<any>("/api/auth/me"),
+  updateMe: (data: any) => request<any>("/api/auth/me", { method: "PUT", body: JSON.stringify(data) }),
   changeMyPassword: (data: { current_password: string; new_password: string }) =>
     request<void>("/api/auth/me/password", { method: "PUT", body: JSON.stringify(data) }),
 

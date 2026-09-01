@@ -11,6 +11,14 @@ from .database import engine
 NEW_COLUMNS = {
     "users": {
         "assigned_department_id": "VARCHAR(36)",
+        "name": "VARCHAR(150)",
+        "phone": "VARCHAR(30)",
+        "address_line1": "VARCHAR(200)",
+        "address_line2": "VARCHAR(200)",
+        "city": "VARCHAR(100)",
+        "state": "VARCHAR(100)",
+        "country": "VARCHAR(100)",
+        "postal_code": "VARCHAR(20)",
     },
     "attendance_logs": {
         "status": "VARCHAR(20) DEFAULT 'Present'",

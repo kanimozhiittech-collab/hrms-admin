@@ -1,4 +1,4 @@
-from .auth import LoginIn, TokenOut, Me, ChangePasswordIn
+from .auth import LoginIn, TokenOut, Me, ChangePasswordIn, UpdateMeIn
 from .employee import (
     EmployeeIn, EmployeeOut, EmployeeListItem, EmployeeListResponse,
     AddressIn, EducationIn, ExperienceIn, DependentIn, EmergencyIn, DocumentOut,
