@@ -35,10 +35,8 @@ function nameOf(list: any[], id: string | null, field = "name") {
 
 export default function AccountPage() {
   const [me, setMe] = useState<any>(null);
-  const [company, setCompany] = useState<any>(null);
   const [employee, setEmployee] = useState<any>(null);
   const [meta, setMeta] = useState<{ depts: any[]; desigs: any[]; locs: any[]; shifts: any[] }>({ depts: [], desigs: [], locs: [], shifts: [] });
-  const [logoFailed, setLogoFailed] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -46,7 +44,6 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
-  useEffect(() => { api.getCompany().then(setCompany).catch(() => {}); }, []);
   useEffect(() => {
     Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
       .then(([depts, desigs, locs, shifts]) => setMeta({ depts, desigs, locs, shifts }));
@@ -126,38 +123,6 @@ export default function AccountPage() {
                 <a href={`/employees/${employee.id}`} className="text-sm text-brand-600 hover:underline">
                   View full employee profile (address, bank, documents, education, experience) →
                 </a>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {company && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex items-center gap-3">
-                {company.logo_url && !logoFailed
-                  ? <img src={fileUrl(company.logo_url)} alt="Logo" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" onError={() => setLogoFailed(true)}/>
-                  : <div className="grid h-14 w-14 place-items-center rounded-lg bg-slate-100 text-[10px] text-slate-300">No logo</div>}
-                <p className="text-sm font-semibold text-slate-900">{company.name}</p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Website" value={company.website} />
-                <Field label="Type of Organization" value={company.org_type} />
-                <Field label="Contact Person" value={company.contact_person} />
-                <Field label="Contact Number" value={company.contact_number} />
-                <Field label="Alternate Contact Number" value={company.alt_contact_number} />
-                <Field label="Contact Email" value={company.contact_email} />
-                <Field label="GST Number" value={company.gst_number} />
-                <Field label="PAN Number" value={company.pan_number} />
-                <Field label="Address Line 1" value={company.address_line1} />
-                <Field label="Address Line 2" value={company.address_line2} />
-                <Field label="City" value={company.city} />
-                <Field label="State" value={company.state} />
-                <Field label="Country" value={company.country} />
-                <Field label="ZIP/PIN Code" value={company.postal_code} />
               </div>
             </CardContent>
           </Card>
