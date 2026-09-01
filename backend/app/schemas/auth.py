@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -14,3 +14,7 @@ class Me(BaseModel):
     role: str
     company_id: str
     employee_id: str | None = None
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)

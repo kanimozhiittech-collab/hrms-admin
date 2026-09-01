@@ -58,7 +58,7 @@ export function Topbar({ title }: { title: string }) {
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 w-44 rounded-md border border-slate-200 bg-white shadow-lg py-1 z-20">
                 <Link
-                  href={me?.employee_id ? `/employees/${me.employee_id}` : "/dashboard?tab=Profile"}
+                  href={me?.employee_id ? `/employees/${me.employee_id}` : "/account"}
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >

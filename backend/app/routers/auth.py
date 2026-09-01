@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
-from ..schemas import LoginIn, TokenOut, Me
-from ..core.security import verify_password, create_token
+from ..schemas import LoginIn, TokenOut, Me, ChangePasswordIn
+from ..core.security import verify_password, create_token, hash_password
 from .deps import current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -22,3 +22,11 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 def me(user: User = Depends(current_user)):
     return Me(id=user.id, email=user.email, role=user.role,
               company_id=user.company_id, employee_id=user.employee_id)
+
+@router.put("/me/password", status_code=204)
+def change_my_password(body: ChangePasswordIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(400, "Current password is incorrect")
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    return None
