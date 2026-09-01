@@ -196,9 +196,9 @@ export default function EmployeeDetailPage() {
       <div className="space-y-4 p-4 lg:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <Link href="/employees" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+            <Link href={isHR ? "/employees" : "/account"} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
               <ArrowLeft className="h-4 w-4" />
-              Back to employees
+              {isHR ? "Back to employees" : "Back to My Profile"}
             </Link>
             <h2 className="mt-2 text-xl font-semibold text-slate-900">
               {loading ? "Loading..." : `${employee?.first_name ?? ""} ${employee?.last_name ?? ""}`}

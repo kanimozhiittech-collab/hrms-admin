@@ -29,10 +29,17 @@ function Field({ label, value: fieldValue }: { label: string; value: any }) {
   );
 }
 
+function nameOf(list: any[], id: string | null, field = "name") {
+  return list.find((x) => x.id === id)?.[field];
+}
+
 export default function AccountPage() {
   const [me, setMe] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
+  const [employee, setEmployee] = useState<any>(null);
+  const [meta, setMeta] = useState<{ depts: any[]; desigs: any[]; locs: any[]; shifts: any[] }>({ depts: [], desigs: [], locs: [], shifts: [] });
   const [logoFailed, setLogoFailed] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -40,6 +47,13 @@ export default function AccountPage() {
 
   useEffect(() => { api.me().then(setMe).catch(() => {}); }, []);
   useEffect(() => { api.getCompany().then(setCompany).catch(() => {}); }, []);
+  useEffect(() => {
+    Promise.all([api.departments(), api.designations(), api.locations(), api.shifts()])
+      .then(([depts, desigs, locs, shifts]) => setMeta({ depts, desigs, locs, shifts }));
+  }, []);
+  useEffect(() => {
+    if (me?.employee_id) api.getEmployee(me.employee_id).then(setEmployee).catch(() => {});
+  }, [me?.employee_id]);
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +90,46 @@ export default function AccountPage() {
             <Field label="Role" value={me ? ROLE_LABELS[me.role] ?? me.role : undefined} />
           </CardContent>
         </Card>
+
+        {employee && (
+          <Card>
+            <CardHeader>
+              <CardTitle>My Employee Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex items-center gap-3">
+                {employee.photo_url && !photoFailed
+                  ? <img src={fileUrl(employee.photo_url)} alt="Photo" className="h-14 w-14 rounded-full border border-slate-200 object-cover" onError={() => setPhotoFailed(true)}/>
+                  : <div className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-[10px] text-slate-300">No photo</div>}
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{employee.first_name} {employee.last_name}</p>
+                  <p className="text-xs text-slate-500">{employee.emp_code} · {employee.work_email}</p>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Gender" value={employee.gender} />
+                <Field label="Date of Birth" value={employee.date_of_birth} />
+                <Field label="Blood Group" value={employee.blood_group} />
+                <Field label="Marital Status" value={employee.marital_status} />
+                <Field label="Nationality" value={employee.nationality} />
+                <Field label="Mobile" value={employee.mobile} />
+                <Field label="Personal Email" value={employee.personal_email} />
+                <Field label="Department" value={nameOf(meta.depts, employee.department_id)} />
+                <Field label="Designation" value={nameOf(meta.desigs, employee.designation_id, "title")} />
+                <Field label="Employee Type" value={employee.employee_type} />
+                <Field label="Date of Joining" value={employee.date_of_joining} />
+                <Field label="Work Location" value={nameOf(meta.locs, employee.work_location_id)} />
+                <Field label="Shift" value={nameOf(meta.shifts, employee.shift_id)} />
+                <Field label="Status" value={employee.status} />
+              </div>
+              <div className="mt-4">
+                <a href={`/employees/${employee.id}`} className="text-sm text-brand-600 hover:underline">
+                  View full employee profile (address, bank, documents, education, experience) →
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {company && (
           <Card>
