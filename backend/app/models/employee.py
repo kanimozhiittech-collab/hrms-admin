@@ -51,6 +51,18 @@ class Employee(Base):
     ctc: Mapped[float | None] = mapped_column(Numeric(14, 2))
     pay_frequency: Mapped[str | None] = mapped_column(String(20), default="Monthly")  # Monthly/Weekly/Hourly
 
+    # ---- Payroll — computed salary breakup, saved by /api/employees/{id}/salary.
+    # Kept out of EmployeeIn/EmployeeOut on purpose: the main employee edit form
+    # doesn't know about these fields, so if they were part of EmployeeIn every
+    # ordinary profile save would silently reset them to their schema defaults. ----
+    salary_breakup: Mapped[str | None] = mapped_column(Text)  # JSON-encoded breakup dict
+    monthly_gross: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    is_esi_applicable: Mapped[bool] = mapped_column(Boolean, default=False)
+    eps_contribute: Mapped[bool] = mapped_column(Boolean, default=True)
+    eps_actual_wages: Mapped[bool] = mapped_column(Boolean, default=False)
+    vpf_percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    pt_state_override: Mapped[str | None] = mapped_column(String(100))
+
     # ---- Bank ----
     bank_name: Mapped[str | None] = mapped_column(String(120))
     bank_account_no: Mapped[str | None] = mapped_column(String(40))

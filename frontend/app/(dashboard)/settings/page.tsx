@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye, Search,
   Users, CalendarDays, Clock, FileText, Building2,
-  Mail, ListChecks, Settings2,
+  Mail, ListChecks, Settings2, Wallet,
 } from "lucide-react";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -36,6 +36,7 @@ const SERVICES = [
   { key: "hr-letters", label: "HR Letters", icon: Mail, status: "ready" as const },
   { key: "tasks", label: "Tasks", icon: ListChecks, status: "ready" as const },
   { key: "general", label: "General", icon: Settings2, status: "ready" as const },
+  { key: "payroll", label: "Payroll Master", icon: Wallet, status: "ready" as const },
 ];
 
 /** Deleting departments/designations/locations/employees is admin-only —
@@ -2194,6 +2195,540 @@ function GeneralService() {
   );
 }
 
+/* ---------- Payroll Master ---------- */
+
+const WORK_WEEK_DAYS = [
+  ["MON", "Mon"], ["TUE", "Tue"], ["WED", "Wed"], ["THU", "Thu"],
+  ["FRI", "Fri"], ["SAT", "Sat"], ["SUN", "Sun"],
+] as const;
+
+function PayrollMasterService() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const section = searchParams.get("section") || "pay-schedule";
+
+  function setSection(v: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("section", v);
+    router.push(`/settings?${params.toString()}`);
+  }
+
+  return (
+    <Tabs defaultValue="pay-schedule" value={section} onValueChange={setSection}>
+      <TabsList>
+        <TabsTrigger value="pay-schedule">Pay Schedule</TabsTrigger>
+        <TabsTrigger value="statutory">Statutory Components</TabsTrigger>
+        <TabsTrigger value="components">Salary Components</TabsTrigger>
+      </TabsList>
+      <TabsContent value="pay-schedule"><PayScheduleService /></TabsContent>
+      <TabsContent value="statutory"><StatutoryComponentsService /></TabsContent>
+      <TabsContent value="components"><SalaryComponentsService /></TabsContent>
+    </Tabs>
+  );
+}
+
+function usePayrollSettings() {
+  const [settings, setSettings] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  async function load() {
+    setLoading(true);
+    try { setSettings(await api.payrollSettings()); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+  return { settings, setSettings, loading, reload: load };
+}
+
+function PayScheduleService() {
+  const { settings, loading } = usePayrollSettings();
+  const [form, setForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!settings) return;
+    setForm({
+      work_week: (settings.work_week || "MON,TUE,WED,THU,FRI,SAT").split(",").filter(Boolean),
+      salary_calc_method: settings.salary_calc_method || "ACTUAL_DAYS",
+      fixed_working_days: settings.fixed_working_days ?? 30,
+      pay_date_type: settings.pay_date_type || "LAST_DAY",
+      custom_pay_day: settings.custom_pay_day ?? 1,
+      first_payroll_month: settings.first_payroll_month ? settings.first_payroll_month.slice(0, 7) : "",
+    });
+  }, [settings]);
+
+  function toggleDay(day: string) {
+    setForm((f: any) => ({
+      ...f,
+      work_week: f.work_week.includes(day) ? f.work_week.filter((d: string) => d !== day) : [...f.work_week, day],
+    }));
+  }
+
+  async function save() {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      const payload = {
+        ...settings, ...form,
+        work_week: form.work_week.join(","),
+        fixed_working_days: form.salary_calc_method === "FIXED_DAYS" ? Number(form.fixed_working_days) : null,
+        custom_pay_day: form.pay_date_type === "CUSTOM" ? Number(form.custom_pay_day) : null,
+        first_payroll_month: form.first_payroll_month ? `${form.first_payroll_month}-01` : null,
+      };
+      await api.updatePayrollSettings(payload);
+      setSaved(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (loading || !form) return <Card><div className="p-10 text-center text-sm text-slate-400">Loading…</div></Card>;
+
+  return (
+    <Card>
+      <div className="p-5 space-y-5">
+        {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{error}</div>}
+        {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-3 py-2">Saved.</div>}
+
+        <ModalField label="Work Week">
+          <div className="flex flex-wrap gap-3">
+            {WORK_WEEK_DAYS.map(([key, label]) => (
+              <label key={key} className="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" checked={form.work_week.includes(key)} onChange={() => toggleDay(key)} />
+                {label}
+              </label>
+            ))}
+          </div>
+        </ModalField>
+
+        <ModalField label="Salary Calculation Method">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="salary_calc_method" checked={form.salary_calc_method === "ACTUAL_DAYS"}
+                onChange={() => setForm((f: any) => ({ ...f, salary_calc_method: "ACTUAL_DAYS" }))} />
+              Actual days in a month (28/30/31 varies)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="salary_calc_method" checked={form.salary_calc_method === "FIXED_DAYS"}
+                onChange={() => setForm((f: any) => ({ ...f, salary_calc_method: "FIXED_DAYS" }))} />
+              Based on fixed working days per month
+            </label>
+            {form.salary_calc_method === "FIXED_DAYS" && (
+              <Input type="number" min={1} max={31} className="max-w-[120px] ml-6" value={form.fixed_working_days}
+                onChange={e => setForm((f: any) => ({ ...f, fixed_working_days: e.target.value }))} />
+            )}
+          </div>
+        </ModalField>
+
+        <ModalField label="Pay Date">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="pay_date_type" checked={form.pay_date_type === "LAST_DAY"}
+                onChange={() => setForm((f: any) => ({ ...f, pay_date_type: "LAST_DAY" }))} />
+              On the last day of every month
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="radio" name="pay_date_type" checked={form.pay_date_type === "CUSTOM"}
+                onChange={() => setForm((f: any) => ({ ...f, pay_date_type: "CUSTOM" }))} />
+              Select pay date
+            </label>
+            {form.pay_date_type === "CUSTOM" && (
+              <Input type="number" min={1} max={28} className="max-w-[120px] ml-6" value={form.custom_pay_day}
+                onChange={e => setForm((f: any) => ({ ...f, custom_pay_day: e.target.value }))} />
+            )}
+          </div>
+        </ModalField>
+
+        <ModalField label="First Payroll Setup — start your first payroll from">
+          <Input type="month" className="max-w-[200px]" value={form.first_payroll_month}
+            onChange={e => setForm((f: any) => ({ ...f, first_payroll_month: e.target.value }))} />
+        </ModalField>
+
+        <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      </div>
+    </Card>
+  );
+}
+
+function StatutoryComponentsService() {
+  const { settings, loading } = usePayrollSettings();
+  const [form, setForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!settings) return;
+    setForm({
+      epf_number: settings.epf_number || "", epf_employer_rate: settings.epf_employer_rate ?? 12,
+      epf_lop_config: settings.epf_lop_config || "PRORATE",
+      eps_contribute: settings.eps_contribute ?? true, eps_actual_wages: settings.eps_actual_wages ?? false,
+      esi_number: settings.esi_number || "", esi_deduction_cycle: settings.esi_deduction_cycle || "MONTHLY",
+      pt_number: settings.pt_number || "", pt_state: settings.pt_state || "", pt_deduction_cycle: settings.pt_deduction_cycle || "MONTHLY",
+      lwf_employee_amount: settings.lwf_employee_amount ?? "", lwf_employer_amount: settings.lwf_employer_amount ?? "",
+      lwf_deduction_cycle: settings.lwf_deduction_cycle || "SEMI_ANNUALLY",
+    });
+  }, [settings]);
+
+  async function save() {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      await api.updatePayrollSettings({
+        ...settings, ...form,
+        epf_employer_rate: Number(form.epf_employer_rate) || 12,
+        lwf_employee_amount: form.lwf_employee_amount === "" ? null : Number(form.lwf_employee_amount),
+        lwf_employer_amount: form.lwf_employer_amount === "" ? null : Number(form.lwf_employer_amount),
+      });
+      setSaved(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (loading || !form) return <Card><div className="p-10 text-center text-sm text-slate-400">Loading…</div></Card>;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="p-5 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-900">Employees&apos; Provident Fund (EPF)</h3></div>
+        <div className="p-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <ModalField label="EPF Number">
+              <Input placeholder="XX/XXX/1234567/000/0000" value={form.epf_number} onChange={e => setForm((f: any) => ({ ...f, epf_number: e.target.value }))} />
+            </ModalField>
+            <ModalField label="Employer Contribution Rate (%)">
+              <Input type="number" step="0.01" value={form.epf_employer_rate} onChange={e => setForm((f: any) => ({ ...f, epf_employer_rate: e.target.value }))} />
+            </ModalField>
+          </div>
+          <ModalField label="PF Configuration when LOP Applied">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" name="epf_lop_config" checked={form.epf_lop_config === "PRORATE"}
+                  onChange={() => setForm((f: any) => ({ ...f, epf_lop_config: "PRORATE" }))} />
+                Prorate PF on actual basic earned
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="radio" name="epf_lop_config" checked={form.epf_lop_config === "FULL_BASIC"}
+                  onChange={() => setForm((f: any) => ({ ...f, epf_lop_config: "FULL_BASIC" }))} />
+                Deduct PF on full basic regardless of LOP
+              </label>
+            </div>
+          </ModalField>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={form.eps_contribute} onChange={e => setForm((f: any) => ({ ...f, eps_contribute: e.target.checked }))} />
+            Contribute to Employee Pension Scheme (EPS) — 8.33% of employer&apos;s 12%, capped at ₹15,000 basic
+          </label>
+          {form.eps_contribute && (
+            <label className="flex items-center gap-2 text-sm text-slate-700 ml-6">
+              <input type="checkbox" checked={form.eps_actual_wages} onChange={e => setForm((f: any) => ({ ...f, eps_actual_wages: e.target.checked }))} />
+              Contribute EPS at Actual PF Wages (not capped at ₹15,000)
+            </label>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="p-5 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-900">Employees&apos; State Insurance (ESI)</h3></div>
+        <div className="p-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <ModalField label="ESI Number">
+              <Input placeholder="17-digit ESI number" value={form.esi_number} onChange={e => setForm((f: any) => ({ ...f, esi_number: e.target.value }))} />
+            </ModalField>
+            <ModalField label="Deduction Cycle">
+              <Select value={form.esi_deduction_cycle} onChange={e => setForm((f: any) => ({ ...f, esi_deduction_cycle: e.target.value }))}>
+                <option value="MONTHLY">Monthly</option>
+                <option value="SEMI_ANNUALLY">Semi-annually</option>
+              </Select>
+            </ModalField>
+          </div>
+          <p className="text-xs text-slate-500">
+            Employee&apos;s contribution is fixed at 0.75% of gross wages, employer&apos;s at 3.25% — applies automatically when an
+            employee&apos;s monthly gross is ₹21,000 or less.
+          </p>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="p-5 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-900">Professional Tax (PT)</h3></div>
+        <div className="p-5 space-y-4">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <ModalField label="PT Number">
+              <Input value={form.pt_number} onChange={e => setForm((f: any) => ({ ...f, pt_number: e.target.value }))} />
+            </ModalField>
+            <ModalField label="State">
+              <SearchableSelect value={form.pt_state} onChange={v => setForm((f: any) => ({ ...f, pt_state: v }))}
+                options={INDIAN_STATES.map(s => ({ value: s, label: s }))} />
+            </ModalField>
+            <ModalField label="Deduction Cycle">
+              <Select value={form.pt_deduction_cycle} onChange={e => setForm((f: any) => ({ ...f, pt_deduction_cycle: e.target.value }))}>
+                <option value="MONTHLY">Monthly</option>
+                <option value="SEMI_ANNUALLY">Semi-annually</option>
+              </Select>
+            </ModalField>
+          </div>
+        </div>
+      </Card>
+
+      <PtSlabsCard ptState={form.pt_state} />
+
+      <Card>
+        <div className="p-5 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-900">Labour Welfare Fund (LWF)</h3></div>
+        <div className="p-5 grid sm:grid-cols-3 gap-4">
+          <ModalField label="Employee's Contribution (₹)">
+            <Input type="number" value={form.lwf_employee_amount} onChange={e => setForm((f: any) => ({ ...f, lwf_employee_amount: e.target.value }))} />
+          </ModalField>
+          <ModalField label="Employer's Contribution (₹)">
+            <Input type="number" value={form.lwf_employer_amount} onChange={e => setForm((f: any) => ({ ...f, lwf_employer_amount: e.target.value }))} />
+          </ModalField>
+          <ModalField label="Deduction Cycle">
+            <Select value={form.lwf_deduction_cycle} onChange={e => setForm((f: any) => ({ ...f, lwf_deduction_cycle: e.target.value }))}>
+              <option value="MONTHLY">Monthly</option>
+              <option value="SEMI_ANNUALLY">Semi-annually</option>
+            </Select>
+          </ModalField>
+        </div>
+      </Card>
+
+      {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{error}</div>}
+      {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-3 py-2">Saved.</div>}
+      <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Statutory Components"}</Button>
+    </div>
+  );
+}
+
+function PtSlabsCard({ ptState }: { ptState: string }) {
+  const [slabs, setSlabs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [loadingDefaults, setLoadingDefaults] = useState(false);
+  const [form, setForm] = useState({ salary_from: "", salary_to: "", pt_amount: "" });
+
+  async function load() {
+    setLoading(true);
+    try { setSlabs(await api.payrollPtSlabs()); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function addSlab() {
+    if (form.salary_from === "" || form.pt_amount === "") return;
+    setError("");
+    try {
+      await api.createPtSlab({
+        salary_from: Number(form.salary_from),
+        salary_to: form.salary_to === "" ? null : Number(form.salary_to),
+        pt_amount: Number(form.pt_amount),
+      });
+      setForm({ salary_from: "", salary_to: "", pt_amount: "" });
+      await load();
+    } catch (e: any) { setError(e.message); }
+  }
+
+  async function removeSlab(id: string) {
+    await api.deletePtSlab(id);
+    await load();
+  }
+
+  async function loadDefaults() {
+    if (!ptState) { setError("Select a PT state above first"); return; }
+    setLoadingDefaults(true); setError("");
+    try { await api.loadDefaultPtSlabs(ptState); await load(); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoadingDefaults(false); }
+  }
+
+  return (
+    <Card>
+      <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-900">PT Slabs</h3>
+        <Button size="sm" variant="outline" onClick={loadDefaults} disabled={loadingDefaults}>
+          {loadingDefaults ? "Loading…" : `Load default slabs${ptState ? ` for ${ptState}` : ""}`}
+        </Button>
+      </div>
+      {error && <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left">
+              <th className="px-4 py-2 font-medium">Salary From</th>
+              <th className="px-4 py-2 font-medium">Salary To</th>
+              <th className="px-4 py-2 font-medium">PT Amount</th>
+              <th className="px-4 py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && slabs.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No PT slabs configured.</td></tr>}
+            {slabs.map(s => (
+              <tr key={s.id} className="border-t border-slate-100">
+                <td className="px-4 py-2 tabular-nums">₹{s.salary_from}</td>
+                <td className="px-4 py-2 tabular-nums">{s.salary_to != null ? `₹${s.salary_to}` : "and above"}</td>
+                <td className="px-4 py-2 tabular-nums">₹{s.pt_amount}</td>
+                <td className="px-4 py-2">
+                  <button onClick={() => removeSlab(s.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t border-slate-100 bg-slate-50/50">
+              <td className="px-4 py-2"><Input type="number" placeholder="0" value={form.salary_from} onChange={e => setForm(f => ({ ...f, salary_from: e.target.value }))} /></td>
+              <td className="px-4 py-2"><Input type="number" placeholder="and above" value={form.salary_to} onChange={e => setForm(f => ({ ...f, salary_to: e.target.value }))} /></td>
+              <td className="px-4 py-2"><Input type="number" placeholder="0" value={form.pt_amount} onChange={e => setForm(f => ({ ...f, pt_amount: e.target.value }))} /></td>
+              <td className="px-4 py-2"><Button size="sm" onClick={addSlab}><Plus className="h-3.5 w-3.5" />Add</Button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+const COMPONENT_CATEGORIES: { key: string; label: string; calcTypes: [string, string][] }[] = [
+  { key: "EARNING", label: "Earnings", calcTypes: [["PERCENT_CTC", "% of CTC"], ["PERCENT_BASIC", "% of Basic"], ["FIXED", "Fixed Amount"], ["BALANCING", "Balancing/Remaining"]] },
+  { key: "DEDUCTION", label: "Deductions", calcTypes: [["AUTO_STATUTORY", "Auto/Statutory"], ["FIXED", "Fixed Amount"], ["PERCENT_BASIC", "% of Basic"], ["PERCENT_GROSS", "% of Gross"]] },
+  { key: "BENEFIT", label: "Benefits", calcTypes: [["AUTO_STATUTORY", "Auto/Statutory"], ["PERCENT_BASIC", "% of Basic"], ["PERCENT_GROSS", "% of Gross"], ["FIXED", "Fixed Amount"]] },
+  { key: "REIMBURSEMENT", label: "Reimbursements", calcTypes: [["FIXED", "Monthly Limit"]] },
+];
+
+function SalaryComponentsService() {
+  return (
+    <div className="space-y-6">
+      {COMPONENT_CATEGORIES.map(c => <ComponentCategoryList key={c.key} category={c.key} label={c.label} calcTypes={c.calcTypes} />)}
+    </div>
+  );
+}
+
+const BLANK_COMPONENT = { name: "", calc_type: "", value: "", is_taxable: true, is_statutory: false, is_active: true, show_in_payslip: true, max_limit: "", requires_bill: false };
+
+function ComponentCategoryList({ category, label, calcTypes }: { category: string; label: string; calcTypes: [string, string][] }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<any>({ ...BLANK_COMPONENT, calc_type: calcTypes[0][0] });
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { setItems(await api.payrollComponents(category)); }
+    catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function resetForm() { setForm({ ...BLANK_COMPONENT, calc_type: calcTypes[0][0] }); setEditingId(null); }
+  function startEdit(c: any) {
+    setForm({
+      name: c.name, calc_type: c.calc_type, value: c.value ?? "", is_taxable: c.is_taxable,
+      is_statutory: c.is_statutory, is_active: c.is_active, show_in_payslip: c.show_in_payslip,
+      max_limit: c.max_limit ?? "", requires_bill: c.requires_bill,
+    });
+    setEditingId(c.id); setShowForm(true);
+  }
+
+  async function save() {
+    if (!form.name.trim()) return;
+    setSaving(true); setError("");
+    const payload = {
+      ...form,
+      value: form.value === "" ? null : Number(form.value),
+      max_limit: form.max_limit === "" ? null : Number(form.max_limit),
+      category,
+    };
+    try {
+      if (editingId) await api.updatePayrollComponent(editingId, payload);
+      else await api.createPayrollComponent(payload);
+      resetForm(); setShowForm(false); await load();
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm(`Delete this ${label.toLowerCase().slice(0, -1)}?`)) return;
+    try { await api.deletePayrollComponent(id); await load(); }
+    catch (e: any) { setError(e.message); }
+  }
+
+  return (
+    <Card>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+        <div className="text-sm font-semibold text-slate-900">{label} <span className="font-normal text-slate-400">({items.length})</span></div>
+        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}><Plus className="h-4 w-4" />Add {label.slice(0, -1)}</Button>
+      </div>
+      {error && <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
+      <div className="divide-y divide-slate-100">
+        {loading && <div className="px-4 py-6 text-center text-sm text-slate-400">Loading…</div>}
+        {!loading && items.length === 0 && <div className="px-4 py-6 text-center text-sm text-slate-400">No {label.toLowerCase()} configured.</div>}
+        {items.map(c => (
+          <div key={c.id} className="px-4 py-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-900 flex items-center gap-2">
+                {c.name}
+                {!c.is_active && <Badge tone="slate">Inactive</Badge>}
+                {c.is_statutory && <Badge tone="blue">Statutory</Badge>}
+              </div>
+              <div className="text-xs text-slate-500">
+                {calcTypes.find(([k]) => k === c.calc_type)?.[1] || c.calc_type}
+                {c.value != null ? ` · ${c.value}${c.calc_type.startsWith("PERCENT") ? "%" : ""}` : ""}
+                {c.max_limit != null ? ` · limit ₹${c.max_limit}/mo` : ""}
+              </div>
+            </div>
+            <button onClick={() => startEdit(c)} className="text-slate-400 hover:text-slate-700"><Pencil className="h-3.5 w-3.5" /></button>
+            <button onClick={() => remove(c.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <Modal
+          title={editingId ? `Edit ${label.slice(0, -1)}` : `Add ${label.slice(0, -1)}`}
+          onClose={() => setShowForm(false)}
+          footer={<>
+            <Button onClick={save} disabled={saving || !form.name.trim()}>{saving ? "Saving…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </>}
+        >
+          <ModalField label="Component Name *">
+            <Input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} autoFocus />
+          </ModalField>
+          <div className="grid grid-cols-2 gap-4">
+            <ModalField label="Calculation Type">
+              <Select value={form.calc_type} onChange={e => setForm((f: any) => ({ ...f, calc_type: e.target.value }))}>
+                {calcTypes.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </Select>
+            </ModalField>
+            {form.calc_type !== "BALANCING" && form.calc_type !== "AUTO_STATUTORY" && (
+              <ModalField label={category === "REIMBURSEMENT" ? "Max Limit / month (₹)" : "Value"}>
+                <Input type="number" value={form.value} onChange={e => setForm((f: any) => ({ ...f, value: e.target.value }))} />
+              </ModalField>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {category !== "REIMBURSEMENT" && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={form.is_taxable} onChange={e => setForm((f: any) => ({ ...f, is_taxable: e.target.checked }))} />
+                Taxable
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={form.is_active} onChange={e => setForm((f: any) => ({ ...f, is_active: e.target.checked }))} />
+              Active
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={form.show_in_payslip} onChange={e => setForm((f: any) => ({ ...f, show_in_payslip: e.target.checked }))} />
+              Show in Payslip
+            </label>
+            {category === "REIMBURSEMENT" && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={form.requires_bill} onChange={e => setForm((f: any) => ({ ...f, requires_bill: e.target.checked }))} />
+                Requires Bill Upload
+              </label>
+            )}
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <Suspense fallback={null}>
@@ -2255,6 +2790,7 @@ function SettingsPageInner() {
           {service.key === "hr-letters" && <HrLettersService />}
           {service.key === "tasks" && <TasksService />}
           {service.key === "general" && <GeneralService />}
+          {service.key === "payroll" && <PayrollMasterService />}
         </div>
       </>
     );

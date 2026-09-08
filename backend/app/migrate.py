@@ -12,6 +12,15 @@ NEW_COLUMNS = {
     "users": {
         "assigned_department_id": "VARCHAR(36)",
     },
+    "employees": {
+        "salary_breakup": "TEXT",
+        "monthly_gross": "NUMERIC(12,2)",
+        "is_esi_applicable": "BOOLEAN DEFAULT FALSE",
+        "eps_contribute": "BOOLEAN DEFAULT TRUE",
+        "eps_actual_wages": "BOOLEAN DEFAULT FALSE",
+        "vpf_percentage": "NUMERIC(5,2) DEFAULT 0",
+        "pt_state_override": "VARCHAR(100)",
+    },
     "attendance_logs": {
         "status": "VARCHAR(20) DEFAULT 'Present'",
         "work_hours": "FLOAT",

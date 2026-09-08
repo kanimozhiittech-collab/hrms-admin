@@ -26,3 +26,9 @@ from .services import (
 )
 from .company import CompanyUpdateIn, CompanyOut
 from .support import SupportTicketIn, SupportTicketOut
+from .payroll import (
+    PayrollSettingsIn, PayrollSettingsOut,
+    SalaryComponentIn, SalaryComponentOut,
+    PTSlabIn, PTSlabOut,
+    EmployeeSalaryIn, EmployeeSalaryOut,
+)

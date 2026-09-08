@@ -11,7 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Badge } from "@/components/ui/badge";
+import { INDIA_STATE_DISTRICTS } from "@/lib/india-states-districts";
 import { api, fileUrl } from "@/lib/api";
+
+const INDIAN_STATES = Object.keys(INDIA_STATE_DISTRICTS);
 
 const DOC_TYPES = ["Aadhaar", "PAN", "Passport", "Resume", "OfferLetter", "Certificate", "Other"];
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -57,6 +62,152 @@ function EmptyBlock({ text }: { text: string }) {
     <div className="rounded-md border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
       {text}
     </div>
+  );
+}
+
+function SalaryCard({ employeeId }: { employeeId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState({ ctc: "", eps_contribute: true, eps_actual_wages: false, vpf_percentage: "0", pt_state_override: "" });
+  const [preview, setPreview] = useState<any>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const s = await api.getEmployeeSalary(employeeId);
+      setForm({
+        ctc: s.ctc ?? "", eps_contribute: s.eps_contribute, eps_actual_wages: s.eps_actual_wages,
+        vpf_percentage: String(s.vpf_percentage ?? 0), pt_state_override: s.pt_state_override || "",
+      });
+      setPreview(s.breakup || null);
+    } catch (error: any) {
+      toast.error(error.message || "Unable to load salary details");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(); }, [employeeId]);
+
+  // Debounced live preview as the admin edits CTC/statutory toggles, mirroring
+  // the calc the backend will persist on Save — same endpoint, no side effects.
+  useEffect(() => {
+    if (loading || form.ctc === "") { if (!loading) setPreview(null); return; }
+    const t = setTimeout(async () => {
+      try {
+        const p = await api.previewEmployeeSalary(employeeId, {
+          ctc: Number(form.ctc), eps_contribute: form.eps_contribute, eps_actual_wages: form.eps_actual_wages,
+          vpf_percentage: Number(form.vpf_percentage) || 0, pt_state_override: form.pt_state_override || null,
+        });
+        setPreview(p.breakup);
+      } catch {
+        // preview is best-effort — a bad intermediate value while typing shouldn't show an error
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form, loading, employeeId]);
+
+  async function save() {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      await api.updateEmployeeSalary(employeeId, {
+        ctc: form.ctc === "" ? null : Number(form.ctc), eps_contribute: form.eps_contribute,
+        eps_actual_wages: form.eps_actual_wages, vpf_percentage: Number(form.vpf_percentage) || 0,
+        pt_state_override: form.pt_state_override || null,
+      });
+      setSaved(true);
+      toast.success("Salary details saved");
+    } catch (error: any) {
+      setError(error.message || "Unable to save salary details");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const gross = preview?.monthly_gross;
+  const esiApplicable = preview?.is_esi_applicable;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Payroll — Salary Details</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Annual CTC (₹)</Label>
+                <Input type="number" value={form.ctc} onChange={e => setForm(f => ({ ...f, ctc: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>PT State Override</Label>
+                <SearchableSelect
+                  value={form.pt_state_override}
+                  onChange={v => setForm(f => ({ ...f, pt_state_override: v }))}
+                  placeholder="Use organization's PT state"
+                  options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={form.eps_contribute} onChange={e => setForm(f => ({ ...f, eps_contribute: e.target.checked }))} />
+                Contribute to Employee Pension Scheme (EPS)
+              </label>
+              {form.eps_contribute && (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={form.eps_actual_wages} onChange={e => setForm(f => ({ ...f, eps_actual_wages: e.target.checked }))} />
+                  Contribute EPS at Actual PF Wages
+                </label>
+              )}
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">VPF (%)</Label>
+                <Input type="number" min={0} max={100} className="w-20" value={form.vpf_percentage}
+                  onChange={e => setForm(f => ({ ...f, vpf_percentage: e.target.value }))} />
+              </div>
+            </div>
+
+            {preview && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-slate-900">Monthly Gross: ₹{gross?.toLocaleString("en-IN")}</span>
+                  <Badge tone={esiApplicable ? "green" : "slate"}>{esiApplicable ? "ESI Applicable" : "ESI Not Applicable"}</Badge>
+                </div>
+                <div className="grid gap-2 text-sm sm:grid-cols-2">
+                  {preview.earnings?.map((e: any) => (
+                    <div key={e.id} className="flex justify-between text-slate-600">
+                      <span>{e.name}</span><span className="tabular-nums">₹{e.amount?.toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 pt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="flex justify-between"><span className="text-slate-500">EPF — Employee</span><span className="tabular-nums">₹{preview.epf_employee?.toLocaleString("en-IN")}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">EPF — Employer</span><span className="tabular-nums">₹{preview.epf_employer_total?.toLocaleString("en-IN")}</span></div>
+                  {esiApplicable && <>
+                    <div className="flex justify-between"><span className="text-slate-500">ESI — Employee</span><span className="tabular-nums">₹{preview.esi_employee?.toLocaleString("en-IN")}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">ESI — Employer</span><span className="tabular-nums">₹{preview.esi_employer?.toLocaleString("en-IN")}</span></div>
+                  </>}
+                  <div className="flex justify-between"><span className="text-slate-500">Professional Tax</span><span className="tabular-nums">₹{preview.pt_amount?.toLocaleString("en-IN")}</span></div>
+                  {Number(form.vpf_percentage) > 0 && (
+                    <div className="flex justify-between"><span className="text-slate-500">VPF</span><span className="tabular-nums">₹{preview.vpf_amount?.toLocaleString("en-IN")}</span></div>
+                  )}
+                  <div className="flex justify-between font-medium text-slate-900"><span>Net Take-home</span><span className="tabular-nums">₹{preview.net_take_home?.toLocaleString("en-IN")}</span></div>
+                </div>
+              </div>
+            )}
+
+            {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">{error}</div>}
+            {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-3 py-2">Saved.</div>}
+            <Button type="button" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Salary Details"}</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -373,6 +524,8 @@ export default function EmployeeDetailPage() {
                   ["Pay Frequency", employee.pay_frequency],
                 ]}
               />
+
+              {isHR && <SalaryCard employeeId={employeeId} />}
 
               <Section
                 title="Bank"

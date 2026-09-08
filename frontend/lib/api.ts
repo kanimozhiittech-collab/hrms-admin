@@ -279,4 +279,28 @@ export const api = {
   listSupportTickets: () => request<any[]>("/api/support/tickets"),
   createSupportTicket: (data: { subject: string; description?: string; priority?: string }) =>
     request<any>("/api/support/tickets", { method: "POST", body: JSON.stringify(data) }),
+
+  // ── Payroll: Master Setup ──
+  payrollSettings: () => request<any>("/api/payroll/master/settings"),
+  updatePayrollSettings: (data: any) => request<any>("/api/payroll/master/settings", { method: "PUT", body: JSON.stringify(data) }),
+
+  payrollComponents: (category?: string) =>
+    request<any[]>(`/api/payroll/master/components${category ? `?category=${category}` : ""}`),
+  createPayrollComponent: (data: any) => request<any>("/api/payroll/master/components", { method: "POST", body: JSON.stringify(data) }),
+  updatePayrollComponent: (id: string, data: any) => request<any>(`/api/payroll/master/components/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deletePayrollComponent: (id: string) => request<void>(`/api/payroll/master/components/${id}`, { method: "DELETE" }),
+
+  payrollPtSlabs: () => request<any[]>("/api/payroll/master/pt-slabs"),
+  createPtSlab: (data: any) => request<any>("/api/payroll/master/pt-slabs", { method: "POST", body: JSON.stringify(data) }),
+  updatePtSlab: (id: string, data: any) => request<any>(`/api/payroll/master/pt-slabs/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deletePtSlab: (id: string) => request<void>(`/api/payroll/master/pt-slabs/${id}`, { method: "DELETE" }),
+  loadDefaultPtSlabs: (state: string) =>
+    request<any[]>(`/api/payroll/master/pt-slabs/load-defaults?state=${encodeURIComponent(state)}`, { method: "POST" }),
+
+  // ── Payroll: Employee Salary ──
+  getEmployeeSalary: (id: string) => request<any>(`/api/payroll/employees/${id}/salary`),
+  updateEmployeeSalary: (id: string, data: any) =>
+    request<any>(`/api/payroll/employees/${id}/salary`, { method: "PUT", body: JSON.stringify(data) }),
+  previewEmployeeSalary: (id: string, data: any) =>
+    request<any>(`/api/payroll/employees/${id}/salary/preview`, { method: "POST", body: JSON.stringify(data) }),
 };
