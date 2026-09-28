@@ -15,8 +15,8 @@ const baseNav = [
   { href: "/leaves", label: "Leaves", icon: CalendarDays },
 ];
 const hrNav = { href: "/employees", label: "Employees", icon: Users };
+const payrollNav = { href: "/payroll", label: "Payroll", icon: Wallet };
 const soon = [
-  { label: "Payroll", icon: Wallet },
   { label: "Documents", icon: FileText },
   { label: "Reports", icon: BarChart3 },
 ];
@@ -54,7 +54,7 @@ export function Sidebar() {
   }
 
   const nav = isHR
-    ? [baseNav[0], hrNav, ...baseNav.slice(1)]
+    ? [baseNav[0], hrNav, payrollNav, ...baseNav.slice(1)]
     : baseNav;
   // Settings is HR/admin-only; Support is for everyone.
   const bottomLinks = isHR ? bottomNav : bottomNav.filter(i => i.href !== "/settings");

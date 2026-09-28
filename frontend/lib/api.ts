@@ -303,4 +303,14 @@ export const api = {
     request<any>(`/api/payroll/employees/${id}/salary`, { method: "PUT", body: JSON.stringify(data) }),
   previewEmployeeSalary: (id: string, data: any) =>
     request<any>(`/api/payroll/employees/${id}/salary/preview`, { method: "POST", body: JSON.stringify(data) }),
+
+  // ── Payroll: Runs ──
+  payrollDashboard: () => request<any>("/api/payroll/dashboard"),
+  createPayrollRun: (month: number, year: number) =>
+    request<any>("/api/payroll/runs", { method: "POST", body: JSON.stringify({ month, year }) }),
+  getPayrollRun: (id: string) => request<any>(`/api/payroll/runs/${id}`),
+  updatePayrollEntry: (runId: string, entryId: string, data: any) =>
+    request<any>(`/api/payroll/runs/${runId}/entries/${entryId}`, { method: "PUT", body: JSON.stringify(data) }),
+  calculatePayrollRun: (id: string) => request<any>(`/api/payroll/runs/${id}/calculate`, { method: "POST" }),
+  finalizePayrollRun: (id: string) => request<any>(`/api/payroll/runs/${id}/finalize`, { method: "POST" }),
 };

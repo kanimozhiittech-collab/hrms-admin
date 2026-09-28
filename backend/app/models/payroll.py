@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, Date, Numeric, Boolean, Text
+from sqlalchemy import String, Integer, ForeignKey, Date, DateTime, Numeric, Boolean, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import date
 from ..database import Base
@@ -76,3 +76,40 @@ class PTSlab(Base):
     salary_from: Mapped[float] = mapped_column(Numeric(10, 2))
     salary_to: Mapped[float | None] = mapped_column(Numeric(10, 2))  # null = "and above"
     pt_amount: Mapped[float] = mapped_column(Numeric(10, 2))
+
+
+class PayrollRun(Base):
+    """One payroll cycle for a company/month/year. DRAFT -> CALCULATED -> FINALIZED
+    (finalized runs are locked; a correction needs a new run)."""
+    __tablename__ = "payroll_runs"
+    __table_args__ = (UniqueConstraint("company_id", "month", "year", name="uq_payroll_run_company_month_year"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True)
+    month: Mapped[int] = mapped_column(Integer)  # 1-12
+    year: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="DRAFT")  # DRAFT | CALCULATED | FINALIZED
+    calculated_at: Mapped[str | None] = mapped_column(DateTime)
+    finalized_at: Mapped[str | None] = mapped_column(DateTime)
+    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+
+
+class PayrollEntry(Base):
+    """One employee's attendance input + calculated result within a PayrollRun."""
+    __tablename__ = "payroll_entries"
+    __table_args__ = (UniqueConstraint("payroll_run_id", "employee_id", name="uq_payroll_entry_run_employee"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    payroll_run_id: Mapped[str] = mapped_column(ForeignKey("payroll_runs.id"), index=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), index=True)
+
+    is_included: Mapped[bool] = mapped_column(Boolean, default=True)
+    total_working_days: Mapped[int] = mapped_column(Integer)
+    days_worked: Mapped[float] = mapped_column(Numeric(5, 2))
+    lop_days: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    has_salary_error: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    breakup: Mapped[str | None] = mapped_column(Text)  # JSON-encoded compute_payroll_entry output
+    gross_earnings: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    total_deductions: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    net_pay: Mapped[float | None] = mapped_column(Numeric(12, 2))

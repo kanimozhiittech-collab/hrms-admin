@@ -6,4 +6,4 @@ from .employee import (
 from .attendance import AttendanceLog, Holiday, RegularizationRequest
 from .leave import LeaveType, LeaveBalance, LeaveRequest, LeaveApprovalConfig
 from .services import OrgFile, LetterRequest, HrTask, ExitDetail, Meeting
-from .payroll import PayrollSettings, SalaryComponent, PTSlab
+from .payroll import PayrollSettings, SalaryComponent, PTSlab, PayrollRun, PayrollEntry

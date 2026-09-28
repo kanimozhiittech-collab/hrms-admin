@@ -31,4 +31,6 @@ from .payroll import (
     SalaryComponentIn, SalaryComponentOut,
     PTSlabIn, PTSlabOut,
     EmployeeSalaryIn, EmployeeSalaryOut,
+    PayrollDashboardOut, PayrollRunSummaryOut, PayrollRunCreateIn,
+    PayrollEntryOut, PayrollEntryUpdateIn, PayrollRunOut,
 )

@@ -26,6 +26,55 @@ def _round(v: float) -> float:
     return round(float(v or 0), 2)
 
 
+def _compute_statutory(
+    basic: float,
+    gross: float,
+    *,
+    epf_employer_rate: float = 12.0,
+    eps_contribute: bool = True,
+    eps_actual_wages: bool = False,
+    vpf_percentage: float = 0.0,
+    pt_slabs: list[dict] | None = None,
+) -> dict:
+    """EPF/ESI/PT/VPF math shared by the standard monthly breakup
+    (compute_salary_breakup) and the LOP-aware payroll-run calc
+    (compute_payroll_entry) — same basic/gross in, same statutory fields out."""
+    pt_slabs = pt_slabs or []
+
+    is_esi_applicable = gross > 0 and gross <= ESI_GROSS_THRESHOLD
+    esi_employee = _round(gross * 0.0075) if is_esi_applicable else 0.0
+    esi_employer = _round(gross * 0.0325) if is_esi_applicable else 0.0
+
+    epf_basis = basic if eps_actual_wages else min(basic, EPF_WAGE_CAP)
+    epf_employee = _round(epf_basis * EMPLOYEE_EPF_RATE)
+    epf_employer_total = _round(epf_basis * (float(epf_employer_rate or 12.0) / 100))
+    eps_basis = min(basic, EPF_WAGE_CAP)
+    eps_amount = _round(eps_basis * EPS_RATE) if eps_contribute else 0.0
+    epf_employer_fund = _round(epf_employer_total - eps_amount)
+
+    pt_amount = 0.0
+    for slab in pt_slabs:
+        lo = float(slab["salary_from"])
+        hi = slab.get("salary_to")
+        if gross >= lo and (hi is None or gross <= float(hi)):
+            pt_amount = _round(slab["pt_amount"])
+            break
+
+    vpf_amount = _round(basic * float(vpf_percentage or 0) / 100)
+
+    return {
+        "is_esi_applicable": is_esi_applicable,
+        "esi_employee": esi_employee,
+        "esi_employer": esi_employer,
+        "epf_employee": epf_employee,
+        "epf_employer_total": epf_employer_total,
+        "eps_amount": eps_amount,
+        "epf_employer_fund": epf_employer_fund,
+        "pt_amount": pt_amount,
+        "vpf_amount": vpf_amount,
+    }
+
+
 def compute_salary_breakup(
     *,
     ctc: float,
@@ -85,40 +134,66 @@ def compute_salary_breakup(
             running_total += row["amount"]
 
     monthly_gross = _round(running_total)
-    is_esi_applicable = monthly_gross > 0 and monthly_gross <= ESI_GROSS_THRESHOLD
-    esi_employee = _round(monthly_gross * 0.0075) if is_esi_applicable else 0.0
-    esi_employer = _round(monthly_gross * 0.0325) if is_esi_applicable else 0.0
-
-    epf_basis = basic_value if eps_actual_wages else min(basic_value, EPF_WAGE_CAP)
-    epf_employee = _round(epf_basis * EMPLOYEE_EPF_RATE)
-    epf_employer_total = _round(epf_basis * (float(epf_employer_rate or 12.0) / 100))
-    eps_basis = min(basic_value, EPF_WAGE_CAP)
-    eps_amount = _round(eps_basis * EPS_RATE) if eps_contribute else 0.0
-    epf_employer_fund = _round(epf_employer_total - eps_amount)
-
-    pt_amount = 0.0
-    for slab in pt_slabs:
-        lo = float(slab["salary_from"])
-        hi = slab.get("salary_to")
-        if monthly_gross >= lo and (hi is None or monthly_gross <= float(hi)):
-            pt_amount = _round(slab["pt_amount"])
-            break
-
-    vpf_amount = _round(basic_value * float(vpf_percentage or 0) / 100)
+    statutory = _compute_statutory(
+        basic_value, monthly_gross,
+        epf_employer_rate=epf_employer_rate, eps_contribute=eps_contribute,
+        eps_actual_wages=eps_actual_wages, vpf_percentage=vpf_percentage, pt_slabs=pt_slabs,
+    )
 
     return {
         "annual_ctc": _round(ctc),
         "earnings": resolved,
         "basic": basic_value,
         "monthly_gross": monthly_gross,
-        "is_esi_applicable": is_esi_applicable,
-        "esi_employee": esi_employee,
-        "esi_employer": esi_employer,
-        "epf_employee": epf_employee,
-        "epf_employer_total": epf_employer_total,
-        "eps_amount": eps_amount,
-        "epf_employer_fund": epf_employer_fund,
-        "pt_amount": pt_amount,
-        "vpf_amount": vpf_amount,
-        "net_take_home": _round(monthly_gross - epf_employee - esi_employee - pt_amount),
+        **statutory,
+        "net_take_home": _round(monthly_gross - statutory["epf_employee"] - statutory["esi_employee"] - statutory["pt_amount"]),
+    }
+
+
+def compute_payroll_entry(
+    *,
+    stored_breakup: dict,
+    total_working_days: int,
+    days_worked: float,
+    epf_lop_config: str = "PRORATE",
+    epf_employer_rate: float = 12.0,
+    eps_contribute: bool = True,
+    eps_actual_wages: bool = False,
+    vpf_percentage: float = 0.0,
+    pt_slabs: list[dict] | None = None,
+) -> dict:
+    """LOP-aware per-employee-per-month calc for a Payroll Run, built off the
+    employee's already-computed standard monthly breakup (stored_breakup, from
+    compute_salary_breakup). Prorates each earning by days actually worked,
+    then reuses the same statutory math as the standard breakup."""
+    ratio = (days_worked / total_working_days) if total_working_days else 0.0
+
+    earnings_earned = []
+    basic_earned = 0.0
+    for row in stored_breakup.get("earnings", []):
+        earned = _round(row["amount"] * ratio)
+        if row["name"].strip().lower() == "basic":
+            basic_earned = earned
+        earnings_earned.append({"id": row["id"], "name": row["name"], "amount": earned})
+
+    gross_earnings = _round(sum(r["amount"] for r in earnings_earned))
+
+    # "Deduct PF on full basic regardless of LOP" uses the un-prorated monthly
+    # basic for the EPF/EPS calc even though earnings themselves are prorated.
+    basic_for_pf = stored_breakup.get("basic", 0) if epf_lop_config == "FULL_BASIC" else basic_earned
+
+    statutory = _compute_statutory(
+        basic_for_pf, gross_earnings,
+        epf_employer_rate=epf_employer_rate, eps_contribute=eps_contribute,
+        eps_actual_wages=eps_actual_wages, vpf_percentage=vpf_percentage, pt_slabs=pt_slabs,
+    )
+    total_deductions = _round(statutory["epf_employee"] + statutory["esi_employee"] + statutory["pt_amount"])
+
+    return {
+        "earnings": earnings_earned,
+        "basic_earned": basic_earned,
+        "gross_earnings": gross_earnings,
+        **statutory,
+        "total_deductions": total_deductions,
+        "net_pay": _round(gross_earnings - total_deductions),
     }

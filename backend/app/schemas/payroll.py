@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 from .employee import _blank_to_none
 from pydantic import model_validator
@@ -95,3 +95,62 @@ class EmployeeSalaryOut(BaseModel):
     pf_number: Optional[str] = None
     uan_number: Optional[str] = None
     esi_number: Optional[str] = None
+
+
+class PayrollRunSummaryOut(BaseModel):
+    id: str
+    month: int
+    year: int
+    status: str
+    employee_count: int
+    total_net_pay: float
+    class Config: from_attributes = True
+
+
+class PayrollDashboardOut(BaseModel):
+    settings_configured: bool
+    total_employees: int
+    employees_with_salary: int
+    esi_applicable_count: int
+    runs: List[PayrollRunSummaryOut]
+
+
+class PayrollRunCreateIn(BaseModel):
+    month: int
+    year: int
+
+
+class PayrollEntryOut(BaseModel):
+    id: str
+    employee_id: str
+    employee_name: str
+    emp_code: str
+    department: Optional[str] = None
+    is_included: bool
+    total_working_days: int
+    days_worked: float
+    lop_days: float
+    has_salary_error: bool
+    breakup: Optional[Dict[str, Any]] = None
+    gross_earnings: Optional[float] = None
+    total_deductions: Optional[float] = None
+    net_pay: Optional[float] = None
+
+
+class PayrollEntryUpdateIn(BaseModel):
+    is_included: Optional[bool] = None
+    days_worked: Optional[float] = None
+    lop_days: Optional[float] = None
+
+    _blank = model_validator(mode="before")(_blank_to_none)
+
+
+class PayrollRunOut(BaseModel):
+    id: str
+    month: int
+    year: int
+    status: str
+    calculated_at: Optional[datetime] = None
+    finalized_at: Optional[datetime] = None
+    entries: List[PayrollEntryOut]
+    skipped: int = 0
