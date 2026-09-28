@@ -12,8 +12,8 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@peoplepulse.io");
-  const [password, setPassword] = useState("Admin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -80,9 +80,6 @@ export default function LoginPage() {
             </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</Button>
-          <p className="text-xs text-slate-500 text-center">
-            Demo creds prefilled. <span className="font-medium">admin@peoplepulse.io / Admin@123</span>
-          </p>
           <p className="text-center text-sm text-slate-500">
             New company?{" "}
             <Link href="/register" className="font-medium text-brand-600 underline">
