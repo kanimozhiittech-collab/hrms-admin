@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Clock, CalendarDays, Wallet, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, LifeBuoy, X } from "lucide-react";
+import { Wallet, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { HomeIcon, AttendanceIcon, EmployeesIcon, LeaveIcon, PayrollIcon, DocumentsIcon, ReportsIcon, SettingsIcon, SupportIcon } from "@/components/icons/sidebar-icons";
 import { cn } from "@/lib/utils";
 import { api, fileUrl } from "@/lib/api";
 import { useSidebar } from "@/lib/sidebar-context";
@@ -10,19 +11,19 @@ import { useSidebar } from "@/lib/sidebar-context";
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
 
 const baseNav = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/attendance", label: "Attendance", icon: Clock },
-  { href: "/leaves", label: "Leaves", icon: CalendarDays },
+  { href: "/dashboard", label: "Home", icon: HomeIcon },
+  { href: "/attendance", label: "Attendance", icon: AttendanceIcon },
+  { href: "/leaves", label: "Leaves", icon: LeaveIcon },
 ];
-const hrNav = { href: "/employees", label: "Employees", icon: Users };
-const payrollNav = { href: "/payroll", label: "Payroll", icon: Wallet };
+const hrNav = { href: "/employees", label: "Employees", icon: EmployeesIcon };
+const payrollNav = { href: "/payroll", label: "Payroll", icon: PayrollIcon };
 const soon = [
-  { label: "Documents", icon: FileText },
-  { label: "Reports", icon: BarChart3 },
+  { label: "Documents", icon: DocumentsIcon },
+  { label: "Reports", icon: ReportsIcon },
 ];
 const bottomNav = [
-  { href: "/support", label: "Support", icon: LifeBuoy },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/support", label: "Support", icon: SupportIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function Sidebar() {

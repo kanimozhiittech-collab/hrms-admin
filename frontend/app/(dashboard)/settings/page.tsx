@@ -17,10 +17,14 @@ import { Modal, ModalField } from "@/components/ui/modal";
 import { api, fileUrl } from "@/lib/api";
 import { INDIA_STATE_DISTRICTS } from "@/lib/india-states-districts";
 import { cn } from "@/lib/utils";
+import { ManageAccountsIcon } from "@/components/icons/manage-accounts-icon";
+import { LeaveTrackerIcon } from "@/components/icons/leave-tracker-icon";
+import {
+  ShiftsIcon, FilesIcon, OrganizationSetupIcon, HrLettersIcon, TasksIcon, GeneralIcon,
+} from "@/components/icons/service-icons";
 import {
   Plus, Trash2, X, Pencil, ArrowLeft, Download, Eye, Search,
-  Users, CalendarDays, Clock, FileText, Building2,
-  Mail, ListChecks, Settings2, Wallet,
+  Mail, Wallet,
 } from "lucide-react";
 
 const HR_ROLES = ["super_admin", "company_admin", "hr_manager"];
@@ -28,14 +32,14 @@ const LIST_PAGE_SIZE = 10;
 const ADMIN_ROLES = ["super_admin", "company_admin"];
 
 const SERVICES = [
-  { key: "manage-accounts", label: "Manage Accounts", icon: Users, status: "ready" as const },
-  { key: "leave-tracker", label: "Leave Tracker", icon: CalendarDays, status: "ready" as const },
-  { key: "shifts", label: "Shifts", icon: Clock, status: "ready" as const },
-  { key: "files", label: "Files", icon: FileText, status: "ready" as const },
-  { key: "employee-info", label: "Organization Setup", icon: Building2, status: "ready" as const },
-  { key: "hr-letters", label: "HR Letters", icon: Mail, status: "ready" as const },
-  { key: "tasks", label: "Tasks", icon: ListChecks, status: "ready" as const },
-  { key: "general", label: "General", icon: Settings2, status: "ready" as const },
+  { key: "manage-accounts", label: "Manage Accounts", icon: ManageAccountsIcon, status: "ready" as const },
+  { key: "leave-tracker", label: "Leave Tracker", icon: LeaveTrackerIcon, status: "ready" as const },
+  { key: "shifts", label: "Shifts", icon: ShiftsIcon, status: "ready" as const },
+  { key: "files", label: "Files", icon: FilesIcon, status: "ready" as const },
+  { key: "employee-info", label: "Organization Setup", icon: OrganizationSetupIcon, status: "ready" as const },
+  { key: "hr-letters", label: "HR Letters", icon: HrLettersIcon, status: "ready" as const },
+  { key: "tasks", label: "Tasks", icon: TasksIcon, status: "ready" as const },
+  { key: "general", label: "General", icon: GeneralIcon, status: "ready" as const },
   { key: "payroll", label: "Payroll Master", icon: Wallet, status: "ready" as const },
 ];
 

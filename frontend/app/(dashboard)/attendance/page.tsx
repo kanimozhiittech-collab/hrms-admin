@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Download, Clock, CalendarClock, CheckCircle2, XCircle, Search } from "lucide-react";
+import { PresentIcon, AbsentIcon, OnLeaveIcon, WorkHrsIcon, OvertimeIcon } from "@/components/icons/attendance-icons";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
@@ -210,16 +211,21 @@ export default function AttendancePage() {
             {/* stat cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {[
-                { label: "Present", value: summary?.present ?? 0, tone: "text-emerald-600" },
-                { label: "Absent", value: summary?.absent ?? 0, tone: "text-red-600" },
-                { label: "On Leave", value: summary?.on_leave ?? 0, tone: "text-blue-600" },
-                { label: "Late", value: summary?.late_count ?? 0, tone: "text-amber-600" },
-                { label: "Work Hrs", value: fmtHoursHM(summary?.total_work_hours ?? 0), tone: "text-slate-800" },
-                { label: "Overtime", value: fmtHoursHM(summary?.total_overtime ?? 0), tone: "text-violet-600" },
+                { label: "Present", value: summary?.present ?? 0, tone: "text-emerald-600", Icon: PresentIcon },
+                { label: "Absent", value: summary?.absent ?? 0, tone: "text-red-600", Icon: AbsentIcon },
+                { label: "On Leave", value: summary?.on_leave ?? 0, tone: "text-blue-600", Icon: OnLeaveIcon },
+                { label: "Late", value: summary?.late_count ?? 0, tone: "text-amber-600", Icon: undefined },
+                { label: "Work Hrs", value: fmtHoursHM(summary?.total_work_hours ?? 0), tone: "text-slate-800", Icon: WorkHrsIcon },
+                { label: "Overtime", value: fmtHoursHM(summary?.total_overtime ?? 0), tone: "text-violet-600", Icon: OvertimeIcon },
               ].map(s => (
                 <Card key={s.label} className="p-4">
-                  <div className={`text-2xl font-bold tabular-nums ${s.tone}`}>{s.value}</div>
-                  <div className="text-xs text-slate-500">{s.label}</div>
+                  <div className="flex items-center gap-3">
+                    {s.Icon && <s.Icon className={`h-7 w-7 shrink-0 ${s.tone}`} />}
+                    <div>
+                      <div className={`text-2xl font-bold tabular-nums ${s.tone}`}>{s.value}</div>
+                      <div className="text-xs text-slate-500">{s.label}</div>
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
